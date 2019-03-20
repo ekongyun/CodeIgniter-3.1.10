@@ -1,0 +1,1727 @@
+<?php if (!defined('BASEPATH')) exit('No direct script access allowed');
+
+class Api extends MY_Controller
+{
+
+    function __construct()
+    {
+        parent::__construct();
+        $this->load->model('Api_model');
+        $this->load->model('Record_model');
+        $this->load->model('Dept_model', 'Dept');
+        $this->config->load('config', true);
+    }
+
+    public function index()
+    {
+        $this->load->view('login_view');
+    }
+
+    public function testapi()
+    {
+        echo "test api";
+    }
+
+    public function phpinfo()
+    {
+        phpinfo();
+    }
+
+    /*
+        * For APP登录函数
+        */
+    function saveLoginInfo($userinfo)
+    {
+        $token = md5($userinfo["name"] . date('y-m-d H:i:s', time()));
+        $arr2 = array('token' => $token);
+        $userinfo["token"] = $token;
+        $this->Bas->saveAdd(
+            'auth',
+            array(
+                'token' => $token,
+                'expiredAt' => date('Y-m-d H:i:s', strtotime('+1 day')),
+                'onlineIp' => $this->input->ip_address(),
+                'userLoginInfo' => json_encode($userinfo),
+                'creatorId' => $userinfo["name"],
+                'createdAt' => date('Y-m-d H:i:s')
+            )
+        );
+
+        // 返回信息
+        $results = array(
+            "success" => true,
+            "message" => "APP登陆成功",
+            "user" => $userinfo,
+            'session' => $_SESSION,
+        );
+
+        $this->Bas->saveEdit('userinfo', array('LASTLOGIN' => date('y-m-d H:i:s', time()), 'LASTIP' => $this->input->ip_address()), array('USERNAME' => $userinfo["name"]));
+        $this->loglib->addlog('APP用户登录成功', serialize(array_merge(array('LASTLOGIN' => date('y-m-d H:i:s', time()), 'LASTIP' => $this->input->ip_address()), array('USERNAME' => $userinfo["name"]))));
+        return $results;
+    }
+
+    /*
+     * For APP登录函数
+     */
+    function login()
+    {
+//        header('Access-Control-Allow-Origin: *');
+//        header("Access-Control-Allow-Credentials: true");
+//        header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+//        header("Access-Control-Allow-Headers: Origin, X-Requested-With, Content-Type, Accept, Authorization");
+//        header('Content-Type: application/json');
+
+        $this->SET_HEADER;   // 设置php CI 处理 CORS 自定义头部
+
+        if ($_SERVER["REQUEST_METHOD"] == 'POST') {   // 只处理post请求，否则options请求 500错误
+            $json_params = file_get_contents('php://input');
+            $data = json_decode($json_params, true);
+//        $token=$_SERVER['x-auth-token'];
+            if (array_key_exists("sessionid", $data)) {
+                session_id($data["sessionid"]);
+            }
+            session_start();
+
+            if (!empty($data)) {
+                if (!empty($data['username']) && !empty($data['password'])) {
+                    $username = $data['username'];
+                    $password = $data['password'];
+                    $input_account = $username;
+                    $input_password = md5($password);
+                    // $results = $this->phpIonicLoginAuthValidateLogin($username, $password);
+                    $result = $this->Api_model->app_user_login_validate($input_account, $input_password);
+
+                    if ($result['success']) {
+                        //完成微信的首次绑定。
+                        if (array_key_exists("wxUserInfo", $_SESSION)) {
+                            if ($result['userinfo']['wxUserId'] == "") $this->Api_model->saveUserWxUserId($result['userinfo']["id"], $_SESSION["wxUserInfo"]["userid"], $_SESSION["wxUserInfo"]["name"]);
+                        }
+                        echo json_encode($this->saveLoginInfo($result['userinfo']));
+                    } else {
+                        // 校验失败，写入token
+                        $this->output->set_status_header(300);
+                        echo '{"success": false,"message": "用户名或密码错误","jump":"","user":"' . $username . '"}';
+                        $this->loglib->addlog('APP用户登录失败', serialize(array_merge(array('LASTLOGIN' => date('y-m-d H:i:s', time()), 'LASTIP' => $this->input->ip_address()), array('USERNAME' => $input_account))));
+                    }
+
+                } else {
+                    $results = array(
+                        "result" => "Error - data incomplete!",
+                    );
+
+                    $jsonData = json_encode($results);
+                    echo $jsonData;
+                }
+            } else { // no data post
+                $results = array(
+                    "result" => "Error - no data!",
+                );
+                $jsonData = json_encode($results);
+                echo $jsonData;
+            }
+        }
+
+    }
+
+    // 根据手机号获取当前用户所属最高机构及其下属机构列表
+    // 返回值1，12，33...
+    function getUserDetplist($UserName)
+    {
+
+        $array = $this->Api_model->getDeptids($UserName);
+        $max = 10000;
+        $j = 0;
+        for ($i = 0; $i < count($array); $i++) {
+            $arr = $this->Api_model->getDeptFatherId($array[$i]->DeptId);
+            $fid_length = count(explode(",", $arr[0]->FatherLst));
+
+            if ($fid_length < $max) {
+                $max = $fid_length;
+                $j = $i;  // 指针父机构最小长度
+            }
+        }
+
+        $fdeptid = $array[$j]->DeptId;  // 最高机构ID
+        $data = $this->Api_model->getDept($fdeptid);  //获取下属所有机构树
+        $CurrentUserDetplist = '';
+        for ($i = 0; $i < count($data); $i++) {
+            if ($i) {
+                $CurrentUserDetplist = $CurrentUserDetplist . ',' . $data[$i]['Id'];
+            } else {
+                $CurrentUserDetplist = $data[$i]['Id'];
+            }
+        }
+        return $CurrentUserDetplist;
+    }
+
+
+    function getAllDetplist()
+    {
+
+        $data = $this->Api_model->getAllDept();  //获取下属所有机构树
+        $CurrentUserDetplist = '';
+        for ($i = 0; $i < count($data); $i++) {
+            if ($i) {
+                $CurrentUserDetplist = $CurrentUserDetplist . ',' . $data[$i]['Id'];
+            } else {
+                $CurrentUserDetplist = $data[$i]['Id'];
+            }
+        }
+        return $CurrentUserDetplist;
+    }
+
+    function getRecord_detial()
+    {
+
+        $this->SET_HEADER;   // 设置php CI 处理 CORS 自定义头部
+        if ($_SERVER["REQUEST_METHOD"] == 'POST') {
+            // 只处理post请求，否则options请求 500错误
+
+            // 检验token过期与否
+            // 过期返回跳转登录页面 返回403即可，
+            $token = $_SERVER["HTTP_X_AUTH_TOKEN"]; // 获取post请求过来的header token
+            $isExpired = $this->Api_model->isExpired($token);
+//            $isExpired = false;
+
+            if ($isExpired) {
+                $this->output->set_status_header(403);
+                echo '{"success": false,"message": "id auth failed 身份认证已失效，请重新登录" }';
+            } else {
+                // echo '{"success": false,"message": "id auth failed 身份认证已失效，请重新登录" }';
+                //处理post提交参数
+                $json_params = file_get_contents('php://input');
+                $data = json_decode($json_params, true);
+
+                if (!empty($data)) {
+                    if (!empty($data['id'])) {
+
+                        //获取出席人
+                        $rows_chuxiren = $this->Api_model->getChuxiMan_p($data['id']);
+                        $rows_quexiren = $this->Api_model->getQuexiMan_p($data['id']);
+                        $rows_liexiren = $this->Api_model->getLiexiMan_p($data['id']);
+
+                        $row_detail = $this->Api_model->getRecord_Detail($data['id']);
+                        $row_detail[0]->chuxiren = $rows_chuxiren;
+                        $row_detail[0]->quexiren = $rows_quexiren;
+                        // var_dump($row_detail[0]);
+                        // $row_detail['chuxiren'] = $rows_chuxiren;
+                        // $row_detail['quexiren'] = $rows_quexiren;
+
+
+                        $Success = $row_detail ? true : false;
+
+                        $results = array(
+                            "success" => $Success,
+                            "result" => $row_detail[0]
+                        );
+                        echo json_encode($results);
+
+                    } else {
+                        $results = array(
+                            "success" => false,
+                            "result" => "Error - data incomplete!",
+                        );
+
+                        $jsonData = json_encode($results);
+                        echo $jsonData;
+                    }
+                } else { // no data post
+                    $results = array(
+                        "success" => false,
+                        "result" => "Error - no data!",
+                    );
+                    $jsonData = json_encode($results);
+                    echo $jsonData;
+
+                }
+            }
+
+        }
+    }
+
+    // 获取精品党课课件pdf...
+    function getdangkeLists()
+    {
+        $this->SET_HEADER;   // 设置php CI 处理 CORS 自定义头部
+
+        if ($_SERVER["REQUEST_METHOD"] == 'POST') {   // 只处理post请求，否则options请求 500错误
+
+            // 检验token过期与否
+            // 过期返回跳转登录页面 返回403即可，
+            $token = $_SERVER["HTTP_X_AUTH_TOKEN"]; // 获取post请求过来的header token
+            $isExpired = $this->Api_model->isExpired($token);
+//            $isExpired = false;
+
+            if ($isExpired) {
+                $this->output->set_status_header(403);
+                echo '{"success": false,"message": "id auth failed 身份认证已失效，请重新登录" }';
+            } else {
+                // 处理post提交参数
+                $json_params = file_get_contents('php://input');
+                $data = json_decode($json_params, true);
+
+                if (!empty($data)) {
+                    if (!empty($data['username']) && !empty($data['page']) && !empty($data['row'])) {
+                        $Page = $data['page'];
+                        $Row = $data['row'];
+                        $UserName = $data['username'];
+
+                        $rows = $this->Api_model->getdangkeLists($UserName, $Page, $Row);
+                        // var_dump($UserDetplist);
+                        $total = $this->Api_model->getdangkeLists_num($UserName);
+
+                        $Success = $rows ? true : false;
+
+                        $results = array(
+                            "success" => $Success,
+                            "result" => $rows,
+                            "total" => $total[0]->cnt
+                        );
+                        echo json_encode($results);
+
+                    } else {
+                        $results = array(
+                            "success" => false,
+                            "result" => "Error - data incomplete!",
+                        );
+
+                        $jsonData = json_encode($results);
+                        echo $jsonData;
+                    }
+                } else { // no data post
+                    $results = array(
+                        "success" => false,
+                        "result" => "Error - no data!",
+                    );
+                    $jsonData = json_encode($results);
+                    echo $jsonData;
+                }
+            }  // no expired end
+        }   // post method end
+    }
+
+    function getRecord_p()
+    {
+        $this->SET_HEADER;   // 设置php CI 处理 CORS 自定义头部
+
+        if ($_SERVER["REQUEST_METHOD"] == 'POST') {   // 只处理post请求，否则options请求 500错误
+
+            // 检验token过期与否
+            // 过期返回跳转登录页面 返回403即可，
+            $token = $_SERVER["HTTP_X_AUTH_TOKEN"]; // 获取post请求过来的header token
+            $isExpired = $this->Api_model->isExpired($token);
+//            $isExpired = false;
+
+            if ($isExpired) {
+                $this->output->set_status_header(403);
+                echo '{"success": false,"message": "id auth failed 身份认证已失效，请重新登录" }';
+            } else {
+                // 处理post提交参数
+                $json_params = file_get_contents('php://input');
+                $data = json_decode($json_params, true);
+
+                if (!empty($data)) {
+                    if (!empty($data['username']) && !empty($data['fenlei']) && !empty($data['page']) && !empty($data['row'])) {
+                        $Page = $data['page'];
+                        $Row = $data['row'];
+                        $fenleiId = $data['fenlei'];
+                        $DeptId = $data['deptId'];
+                        $ShowType = $data['showType'];
+                        $UserName = $data['username'];
+
+                        // 默认可查看所有部门的记录
+//                         $UserDetplist = $this->getAllDetplist();
+                        $UserDetplist = $this->getUserDetplist($UserName);
+
+                        $showDeptList = ($DeptId == '0' || $DeptId == '') ? $UserDetplist : $DeptId;
+
+                        $rows = $this->Api_model->getRecord_p($showDeptList, $fenleiId, $ShowType, $Page, $Row);
+                        //var_dump($UserDetplist);
+                        $total = $this->Api_model->getrecord_p_num($showDeptList, $fenleiId, $ShowType);
+
+                        $Success = $rows ? true : false;
+
+
+                        $results = array(
+                            "success" => $Success,
+                            "result" => $rows,
+                            "total" => $total[0]->cnt
+                        );
+                        echo json_encode($results);
+
+                    } else {
+                        $results = array(
+                            "success" => false,
+                            "result" => "Error - data incomplete!",
+                        );
+
+                        $jsonData = json_encode($results);
+                        echo $jsonData;
+                    }
+                } else { // no data post
+                    $results = array(
+                        "success" => false,
+                        "result" => "Error - no data!",
+                    );
+                    $jsonData = json_encode($results);
+                    echo $jsonData;
+                }
+            }  // no expired end
+        }   // post method end
+    }
+
+    function getrecord_p_num()
+    {
+        $this->SET_HEADER;   // 设置php CI 处理 CORS 自定义头部
+
+        if ($_SERVER["REQUEST_METHOD"] == 'POST') {   // 只处理post请求，否则options请求 500错误
+
+            // 检验token过期与否
+            // 过期返回跳转登录页面 返回403即可，
+            $token = $_SERVER["HTTP_X_AUTH_TOKEN"]; // 获取post请求过来的header token
+            $isExpired = $this->Api_model->isExpired($token);
+//            $isExpired = false;
+
+            if ($isExpired) {
+                $this->output->set_status_header(403);
+                echo '{"success": false,"message": "id auth failed 身份认证已失效，请重新登录" }';
+            } else {
+
+                $rows = $this->Api_model->getrecord_p_num();
+
+                $Success = $rows ? true : false;
+
+                $results = array(
+                    "success" => $Success,
+                    "result" => $rows,
+                );
+                echo json_encode($results);
+
+            }  // no expired end
+        }   // post method end
+    }
+
+    function getnews_p()
+    {
+        $this->SET_HEADER;   // 设置php CI 处理 CORS 自定义头部
+
+        if ($_SERVER["REQUEST_METHOD"] == 'POST') {   // 只处理post请求，否则options请求 500错误
+
+            // 检验token过期与否
+            // 过期返回跳转登录页面 返回403即可，
+            $token = $_SERVER["HTTP_X_AUTH_TOKEN"]; // 获取post请求过来的header token
+            $isExpired = $this->Api_model->isExpired($token);
+//            $isExpired = false;
+
+            if ($isExpired) {
+                $this->output->set_status_header(403);
+                echo '{"success": false,"message": "id auth failed 身份认证已失效，请重新登录" }';
+            } else {
+                // 处理post提交参数
+                $json_params = file_get_contents('php://input');
+                $data = json_decode($json_params, true);
+                if (!empty($data)) {
+                    if (!empty($data['class']) && !empty($data['page']) && !empty($data['row'])) {
+                        $Page = $data['page'];
+                        $Row = $data['row'];
+                        $Class = $data['class'];
+
+                        $rows = $this->Api_model->getnews_p($Class, $Page, $Row);
+
+                        $Success = $rows ? true : false;
+
+                        if ($Success) {
+
+                            $this->Bas->saveEdit(
+                                'auth',
+                                array(
+                                    'expiredAt' => date('Y-m-d H:i:s', strtotime('+1 day')),
+                                    'updatedAt' => date('Y-m-d H:i:s')
+                                ),
+                                array('token' => $token)
+                            );
+                        }
+
+                        $results = array(
+                            "success" => $Success,
+                            "result" => $rows,
+                        );
+                        echo json_encode($results);
+
+                    } else {
+                        $results = array(
+                            "success" => false,
+                            "result" => "Error - data incomplete!",
+                        );
+
+                        $jsonData = json_encode($results);
+                        echo $jsonData;
+                    }
+                } else { // no data post
+                    $results = array(
+                        "success" => false,
+                        "result" => "Error - no data!",
+                    );
+                    $jsonData = json_encode($results);
+                    echo $jsonData;
+                }
+            }  // no expired end
+        }   // post method end
+    }
+
+    function getChuxiMan_p()
+    {
+        $this->SET_HEADER;   // 设置php CI 处理 CORS 自定义头部
+
+        if ($_SERVER["REQUEST_METHOD"] == 'POST') {   // 只处理post请求，否则options请求 500错误
+
+            // 检验token过期与否
+            // 过期返回跳转登录页面 返回403即可，
+            $token = $_SERVER["HTTP_X_AUTH_TOKEN"]; // 获取post请求过来的header token
+            $isExpired = $this->Api_model->isExpired($token);
+
+            if ($isExpired) {
+                $this->output->set_status_header(403);
+                echo '{"success": false,"message": "id auth failed 身份认证已失效，请重新登录" }';
+            } else {
+                // 处理post提交参数
+                $json_params = file_get_contents('php://input');
+                $data = json_decode($json_params, true);
+                if (!empty($data)) {
+                    if (!empty($data['id'])) {
+                        $Id = $data['id'];
+
+                        $rows = $this->Api_model->getChuxiMan_p($Id);
+
+                        echo json_encode($rows);
+
+                    } else {
+                        $results = array(
+                            "result" => "Error - data incomplete!",
+                        );
+
+                        $jsonData = json_encode($results);
+                        echo $jsonData;
+                    }
+                } else { // no data post
+                    $results = array(
+                        "result" => "Error - no data!",
+                    );
+                    $jsonData = json_encode($results);
+                    echo $jsonData;
+                }
+            }  // no expired end
+        }   // post method end
+    }
+
+    function getQuexiMan_p()
+    {
+        $this->SET_HEADER;   // 设置php CI 处理 CORS 自定义头部
+
+        if ($_SERVER["REQUEST_METHOD"] == 'POST') {   // 只处理post请求，否则options请求 500错误
+
+            // 检验token过期与否
+            // 过期返回跳转登录页面 返回403即可，
+            $token = $_SERVER["HTTP_X_AUTH_TOKEN"]; // 获取post请求过来的header token
+            $isExpired = $this->Api_model->isExpired($token);
+
+            if ($isExpired) {
+                $this->output->set_status_header(403);
+                echo '{"success": false,"message": "id auth failed 身份认证已失效，请重新登录" }';
+            } else {
+                // 处理post提交参数
+                $json_params = file_get_contents('php://input');
+                $data = json_decode($json_params, true);
+                if (!empty($data)) {
+                    if (!empty($data['id'])) {
+                        $Id = $data['id'];
+
+                        $rows = $this->Api_model->getQuexiMan_p($Id);
+
+                        echo json_encode($rows);
+
+                    } else {
+                        $results = array(
+                            "result" => "Error - data incomplete!",
+                        );
+
+                        $jsonData = json_encode($results);
+                        echo $jsonData;
+                    }
+                } else { // no data post
+                    $results = array(
+                        "result" => "Error - no data!",
+                    );
+                    $jsonData = json_encode($results);
+                    echo $jsonData;
+                }
+            }  // no expired end
+        }   // post method end
+    }
+
+    function getLiexiMan_p()
+    {
+        $this->SET_HEADER;   // 设置php CI 处理 CORS 自定义头部
+
+        if ($_SERVER["REQUEST_METHOD"] == 'POST') {   // 只处理post请求，否则options请求 500错误
+
+            // 检验token过期与否
+            // 过期返回跳转登录页面 返回403即可，
+            $token = $_SERVER["HTTP_X_AUTH_TOKEN"]; // 获取post请求过来的header token
+            $isExpired = $this->Api_model->isExpired($token);
+
+            if ($isExpired) {
+                $this->output->set_status_header(403);
+                echo '{"success": false,"message": "id auth failed 身份认证已失效，请重新登录" }';
+            } else {
+                // 处理post提交参数
+                $json_params = file_get_contents('php://input');
+                $data = json_decode($json_params, true);
+                if (!empty($data)) {
+                    if (!empty($data['id'])) {
+                        $Id = $data['id'];
+
+                        $rows = $this->Api_model->getLiexiMan_p($Id);
+
+                        echo json_encode($rows);
+
+                    } else {
+                        $results = array(
+                            "result" => "Error - data incomplete!",
+                        );
+
+                        $jsonData = json_encode($results);
+                        echo $jsonData;
+                    }
+                } else { // no data post
+                    $results = array(
+                        "result" => "Error - no data!",
+                    );
+                    $jsonData = json_encode($results);
+                    echo $jsonData;
+                }
+            }  // no expired end
+        }   // post method end
+    }
+
+
+    function getapp_version()
+    {
+        $this->SET_HEADER;   // 设置php CI 处理 CORS 自定义头部
+        $rows = $this->Api_model->getapp_version();
+        $data['data'] = $rows;
+        $Success = $rows ? true : false;
+        //        var_dump($rows[0]->verNum);
+        //  $results = array(
+        //           "success" => $Success,
+        //           "version" => $rows[0]->verNum,
+        //        );
+
+        echo json_encode($data);
+    }
+
+    function getfenlei()
+    {
+        $this->SET_HEADER;   // 设置php CI 处理 CORS 自定义头部
+
+        if ($_SERVER["REQUEST_METHOD"] == 'POST') {   // 只处理post请求，否则options请求 500错误
+
+            // 检验token过期与否
+            // 过期返回跳转登录页面 返回403即可，
+            $token = $_SERVER["HTTP_X_AUTH_TOKEN"]; // 获取post请求过来的header token
+            $isExpired = $this->Api_model->isExpired($token);
+
+            if ($isExpired) {
+                $this->output->set_status_header(403);
+                echo '{"success": false,"message": "id auth failed 身份认证已失效，请重新登录" }';
+            } else {
+                // 处理post提交参数
+                $json_params = file_get_contents('php://input');
+                $data = json_decode($json_params, true);
+
+                if (!empty($data)) {
+
+                    $fatherId = $data['fatherId'];
+
+                    $rows = $this->Api_model->getfenlei($fatherId);
+
+                    $Success = $rows ? true : false;
+                    //        var_dump($rows[0]->verNum);
+                    if ($rows) {
+                        $results = array(
+                            "success" => $Success,
+                            "result" => $rows,
+                        );
+                    } else { // no data post
+                        $results = array(
+                            "success" => $Success,
+                            "result" => "Error - no data!",
+                        );
+
+                    }
+
+                    $jsonData = json_encode($results);
+                    echo $jsonData;
+                } else { // no data post
+                    $results = array(
+                        "result" => "Error - no data!",
+                    );
+                    $jsonData = json_encode($results);
+                    echo $jsonData;
+                }
+            }  // no expired end
+        }
+
+
+    }
+
+    function users()
+    {
+        $this->SET_HEADER;   // 设置php CI 处理 CORS 自定义头部
+//        var_dump($this->MY_URI);
+//        var_dump($this->uri->segment(3,0));
+
+        if ($_SERVER["REQUEST_METHOD"] == 'PATCH') {   // 只处理PATCH请求，否则options请求 500错误
+
+            // 处理PATCH提交参数
+            $json_params = file_get_contents('php://input');
+            $data = json_decode($json_params, true);
+            if (!empty($data)) {
+                if (!empty($data['password']) && !empty($data['old_password'])) {
+
+                    $oldpass = md5($data['old_password']);
+                    $newpass = md5($data['password']);
+                    $UserID = $this->uri->segment(3, 0);
+
+                    $result = $this->Api_model->changepwd($UserID, $oldpass, $newpass);
+
+                    if ($result) {
+                        echo '{"success": true,"message": "密码修改成功！请重新登陆系统"}';
+                    } else {
+                        echo '{"success": false,"message": "原始密码验证错误!."}';
+                    }
+
+                } else {
+                    $results = array(
+                        "result" => "Error - data incomplete!",
+                    );
+
+                    $jsonData = json_encode($results);
+                    echo $jsonData;
+                }
+            } else { // no data post
+                $results = array(
+                    "result" => "Error - no data!",
+                );
+                $jsonData = json_encode($results);
+                echo $jsonData;
+            }
+
+        }
+    }
+
+    function getuserinfo_p()
+    {
+        $this->SET_HEADER;   // 设置php CI 处理 CORS 自定义头部
+
+        if ($_SERVER["REQUEST_METHOD"] == 'POST') {   // 只处理post请求，否则options请求 500错误
+
+            // 检验token过期与否
+            // 过期返回跳转登录页面 返回403即可，
+            $token = $_SERVER["HTTP_X_AUTH_TOKEN"]; // 获取post请求过来的header token
+            $isExpired = $this->Api_model->isExpired($token);
+//            $isExpired = false;
+
+            if ($isExpired) {
+                $this->output->set_status_header(403);
+                echo '{"success": false,"message": "id auth failed 身份认证已失效，请重新登录" }';
+            } else {
+                // 处理post提交参数
+                $json_params = file_get_contents('php://input');
+                $data = json_decode($json_params, true);
+                if (!empty($data)) {
+                    if (!empty($data['userid'])) {
+
+                        $UserId = $data['userid'];
+
+                        $userinfo = $this->Api_model->getUserByID($UserId);
+                        $userrole = $this->Api_model->getRoleByID($UserId);
+                        $userdept = $this->Api_model->getDeptByID($UserId);
+
+                        $deptlist = '';
+                        for ($i = 0; $i < count($userdept); $i++) {
+                            if (!$i) {
+                                $deptlist = $userdept[$i]['DeptName'];
+                            } else {
+                                $deptlist = $deptlist . "," . $userdept[$i]['DeptName'];
+                            }
+                        }
+
+                        // 加入部门信息
+                        $userinfo[0]['deptlist'] = $deptlist;
+
+                        $rolelist = '';
+                        for ($i = 0; $i < count($userrole); $i++) {
+                            if (!$i) {
+                                $rolelist = $userrole[$i]['RoleName'];
+                            } else {
+                                $rolelist = $rolelist . "," . $userrole[$i]['RoleName'];
+                            }
+                        }
+
+                        // 加入角色信息
+                        $userinfo[0]['rolelist'] = $rolelist;
+
+                        echo json_encode($userinfo);
+
+                    } else {
+                        $results = array(
+                            "result" => "Error - data incomplete!",
+                        );
+
+                        $jsonData = json_encode($results);
+                        echo $jsonData;
+                    }
+                } else { // no data post
+                    $results = array(
+                        "result" => "Error - no data!",
+                    );
+                    $jsonData = json_encode($results);
+                    echo $jsonData;
+                }
+            }  // no expired end
+        }   // post method end
+    }
+
+    function verify_image()
+    {
+
+        $conf['name'] = 'verify_code'; //作为配置参数
+        $conf['height'] = '30';
+        $conf['width'] = '60';
+        $conf['border'] = '1';
+        $conf['ispoint'] = true;
+        $conf['isline'] = true;
+
+        $this->load->library('Captcha', $conf);
+        $this->captcha->show();
+        $yzm_session = $this->session->userdata('verify_code');
+        echo $yzm_session;
+    }
+
+    public function exitsystem()
+    {
+        //插入日志部分开始
+        $CI = &get_instance();
+        $UserName = $CI->session->userdata('S_UserName');
+
+        $this->loglib->addlog('用户退出', serialize(array_merge(array('exittime' => date('y-m-d H:i:s', time()), 'LASTIP' => $this->input->ip_address()), array('USERNAME' => $UserName))));
+        $this->session->sess_destroy();
+        //echo '/'.SELF;
+        redirect(base_url());
+    }
+
+//     function phpIonicLoginAuthValidateLogin($username, $password){
+//         $results = array();
+//         if ( $this->systemValidateUserFunction($username, $password) ){
+//             $results = $this->getPhpIonicLoginAuthResult($username);
+//             $results["result"] = "Success!";
+//         }else{
+//             $results = array(
+//                 "result" => "Access denied!",
+//             );
+//         }
+//         return $results;
+//     }
+
+// // below validation is hard coded, please replace below with your server-side validation function
+//     function systemValidateUserFunction($username, $password){
+//         if($username == 'demo' && $password == 'demo'){
+//             return true;
+//         }else{
+//             return false;
+//         }
+//     }
+// // below function is hard coded, please replace below with your server-side function to retrieve user info
+//     function getPhpIonicLoginAuthResult($username){
+//         if($username == 'demo'){
+//             $results = array(
+//                 'username' => 'demo',
+//                 'displayname' => 'Demo'
+//             );
+//         }else{
+//             $results = array(
+//                 "result" => "no such user exists"
+//             );
+//         }
+
+//         return $results;
+//     }
+
+
+    // /*
+    //  * 注册页面获取机构树
+    //  */
+    // function getDeptList()
+    // {
+    //     $this->SET_HEADER;   // 设置php CI 处理 CORS 自定义头部
+    //     $data = $this->Dept->getOptDept(0);  //获取下属所有机构树
+    //     $b = $this->treelib->genTree($data, 'id', 'FatherId', 0);
+    //     echo json_encode($b);
+    // }
+
+
+    function testDept()
+    {
+
+        $array = $this->Dept->getDeptids('13838099061');
+
+        $max = 10000;
+        $j = 0;
+        for ($i = 0; $i < count($array); $i++) {
+            $arr = $this->Dept->getDeptFatherId($array[$i]->DeptId);
+            $fid_length = count(explode(",", $arr[0]->FatherLst));
+
+            if ($fid_length < $max) {
+                $max = $fid_length;
+                $j = $i;  // 指针父机构最小长度
+            }
+        }
+
+        $fdeptid = $array[$j]->DeptId;  // 最高机构ID
+        $data = $this->Dept->getOptDept($fdeptid);  //获取下属所有机构树
+        $ret = $this->Dept->getFahterId($fdeptid); //获取最高机构直属父ID作为终止节点
+        $root = $ret[0]->FatherId;   // treelib 需要终止节点
+        $b = $this->treelib->genTree($data, 'id', 'FatherId', $root);
+
+        $results = array(
+            "result" => $b,
+        );
+
+
+        $jsonData = json_encode($results);
+        echo $jsonData;
+    }
+
+    function getMyDeptList()
+    {
+
+
+        $this->SET_HEADER;   // 设置php CI 处理 CORS 自定义头部
+        //获取用所属的部门Id，用户处于多部门ID
+        if ($_SERVER["REQUEST_METHOD"] == 'POST') {   // 只处理post请求，否则options请求 500错误
+
+            // 检验token过期与否
+            // 过期返回跳转登录页面 返回403即可，
+            $token = $_SERVER["HTTP_X_AUTH_TOKEN"]; // 获取post请求过来的header token
+            $isExpired = $this->Api_model->isExpired($token);
+
+            if ($isExpired) {
+                $this->output->set_status_header(403);
+                echo '{"success": false,"message": "id auth failed 身份认证已失效，请重新登录" }';
+            } else {
+                // 处理post提交参数
+                $json_params = file_get_contents('php://input');
+                $postData = json_decode($json_params, true);
+
+                if (!empty($postData)) {
+                    if (!empty($postData['userId'])) {
+
+                        $array = $this->Dept->getDeptids($postData['userId']);
+
+                        if (empty($array)) {
+                            $results = array(
+                                "result" => "Error - no data!",
+                            );
+
+                            $jsonData = json_encode($results);
+                            echo $jsonData;
+                            return;
+
+                        }
+
+                        $max = 10000;
+                        $j = 0;
+                        for ($i = 0; $i < count($array); $i++) {
+                            $arr = $this->Dept->getDeptFatherId($array[$i]->DeptId);
+                            $fid_length = count(explode(",", $arr[0]->FatherLst));
+
+                            if ($fid_length < $max) {
+                                $max = $fid_length;
+                                $j = $i;  // 指针父机构最小长度
+                            }
+                        }
+
+                        $fdeptid = $array[$j]->DeptId;  // 最高机构ID
+                        $data = $this->Dept->getOptDept($fdeptid);  //获取下属所有机构树
+                        $ret = $this->Dept->getFahterId($fdeptid); //获取最高机构直属父ID作为终止节点
+                        $root = $ret[0]->FatherId;   // treelib 需要终止节点
+                        $b = $this->treelib->genTree($data, 'id', 'FatherId', $root);
+
+                        $results = array(
+                            "result" => array('deptList' => $b),
+                        );
+
+
+                        $jsonData = json_encode($results);
+                        echo $jsonData;
+
+                    } else {
+                        $results = array(
+                            "result" => "Error - data incomplete!",
+                        );
+
+                        $jsonData = json_encode($results);
+                        echo $jsonData;
+                    }
+                } else {
+                    $results = array(
+                        "result" => "Error - no data!",
+                    );
+
+                    $jsonData = json_encode($results);
+                    echo $jsonData;
+                }
+
+            }
+        }
+
+    }
+
+    function getMyDeptuserList()
+    {
+
+
+        $this->SET_HEADER;   // 设置php CI 处理 CORS 自定义头部
+        //获取用所属的部门Id，用户处于多部门ID
+        if ($_SERVER["REQUEST_METHOD"] == 'POST') {   // 只处理post请求，否则options请求 500错误
+
+            // 检验token过期与否
+            // 过期返回跳转登录页面 返回403即可，
+            $token = $_SERVER["HTTP_X_AUTH_TOKEN"]; // 获取post请求过来的header token
+            $isExpired = $this->Api_model->isExpired($token);
+
+            if ($isExpired) {
+                $this->output->set_status_header(403);
+                echo '{"success": false,"message": "id auth failed 身份认证已失效，请重新登录" }';
+            } else {
+                // 处理post提交参数
+                $json_params = file_get_contents('php://input');
+                $postData = json_decode($json_params, true);
+
+                if (!empty($postData)) {
+                    if (!empty($postData['userId'])) {
+
+                        $array = $this->Api_model->getDeptids_q($postData['userId']);
+
+                        if (empty($array)) {
+                            $results = array(
+                                "result" => "Error - no data!",
+                            );
+
+                            $jsonData = json_encode($results);
+                            echo $jsonData;
+                            return;
+
+                        }
+
+                        $max = 10000;
+                        $j = 0;
+                        for ($i = 0; $i < count($array); $i++) {
+                            $arr = $this->Api_model->getDeptFatherId($array[$i]->DeptId);
+                            $fid_length = count(explode(",", $arr[0]->FatherLst));
+
+                            if ($fid_length < $max) {
+                                $max = $fid_length;
+                                $j = $i;  // 指针父机构最小长度
+                            }
+                        }
+
+                        $fdeptid = $array[$j]->DeptId;  // 最高机构ID
+
+                        $data = $this->Api_model->getDeptUserTree($fdeptid);  //获取下属所有机构树
+
+                        $ret = $this->Api_model->getFahterId($fdeptid); //获取最高机构直属父ID作为终止节点
+                        $root = $ret[0]->FatherId;   // treelib 需要终止节点
+                        $b = $this->treelib->genTree($data, 'id', 'FatherId', $root);
+
+
+                        $results = array(
+                            "result" => array('deptuserList' => $b),
+                        );
+
+
+                        $jsonData = json_encode($results);
+                        echo $jsonData;
+
+                    } else {
+                        $results = array(
+                            "result" => "Error - data incomplete!",
+                        );
+
+                        $jsonData = json_encode($results);
+                        echo $jsonData;
+                    }
+                } else {
+                    $results = array(
+                        "result" => "Error - no data!",
+                    );
+
+                    $jsonData = json_encode($results);
+                    echo $jsonData;
+                }
+
+            }
+        }
+
+    }
+
+
+    function getTask()
+    {
+
+        $this->SET_HEADER;   // 设置php CI 处理 CORS 自定义头部
+        //获取用所属的部门Id，用户处于多部门ID
+        if ($_SERVER["REQUEST_METHOD"] == 'POST') {   // 只处理post请求，否则options请求 500错误
+
+            // 检验token过期与否
+            // 过期返回跳转登录页面 返回403即可，
+            $token = $_SERVER["HTTP_X_AUTH_TOKEN"]; // 获取post请求过来的header token
+            $isExpired = $this->Api_model->isExpired($token);
+
+            if ($isExpired) {
+                $this->output->set_status_header(403);
+                echo '{"success": false,"message": "id auth failed 身份认证已失效，请重新登录" }';
+            } else {
+                // 处理post提交参数
+                $json_params = file_get_contents('php://input');
+                $postData = json_decode($json_params, true);
+
+                if (!empty($postData)) {
+                    if (!empty($postData['userId']) || !empty($postData['recordTableId'])) {
+
+                        $array = $this->Api_model->getUserDeptId($postData['userId']);
+
+                        if (empty($array)) {
+                            $results = array(
+                                "result" => "Error - no data!",
+                            );
+
+                            $jsonData = json_encode($results);
+                            echo $jsonData;
+                            return;
+
+                        }
+
+                        $arr = array();
+                        for ($i = 0; $i < count($array); $i++) {
+                            $childdept = $this->Api_model->getChildDeptId($array[$i]['DeptId']);
+                            for ($j = 0; $j < count($childdept); $j++) {
+                                if (!in_array($childdept[$j]['Id'], $arr)) {
+                                    array_push($arr, $childdept[$j]['Id']);
+                                }
+                            }
+                        }
+                        $DeptIdstr = implode(',', $arr);
+
+                        $rows = $this->Api_model->getTask($DeptIdstr, $postData['recordTableId']);  // 1 支部党员大会
+
+                        $results = array(
+                            "result" => array('taskList' => $rows),
+                        );
+
+
+                        $jsonData = json_encode($results);
+                        echo $jsonData;
+
+                    } else {
+                        $results = array(
+                            "result" => "Error - data incomplete!",
+                        );
+
+                        $jsonData = json_encode($results);
+                        echo $jsonData;
+                    }
+                } else {
+                    $results = array(
+                        "result" => "Error - no data!",
+                    );
+
+                    $jsonData = json_encode($results);
+                    echo $jsonData;
+                }
+
+            }
+        }
+
+    }
+
+    function getTableDesc()
+    {
+
+        $this->SET_HEADER;   // 设置php CI 处理 CORS 自定义头部
+        //获取用所属的部门Id，用户处于多部门ID
+        if ($_SERVER["REQUEST_METHOD"] == 'POST') {   // 只处理post请求，否则options请求 500错误
+
+            // 检验token过期与否
+            // 过期返回跳转登录页面 返回403即可，
+            $token = $_SERVER["HTTP_X_AUTH_TOKEN"]; // 获取post请求过来的header token
+            $isExpired = $this->Api_model->isExpired($token);
+
+            if ($isExpired) {
+                $this->output->set_status_header(403);
+                echo '{"success": false,"message": "id auth failed 身份认证已失效，请重新登录" }';
+            } else {
+                // 处理post提交参数
+                $json_params = file_get_contents('php://input');
+                $postData = json_decode($json_params, true);
+
+                if (!empty($postData)) {
+                    if (!empty($postData['userId'])) {
+
+                        $rows = $this->Api_model->getTableDesc();
+
+                        $results = array(
+                            "result" => array('TableDescList' => $rows),
+                        );
+
+
+                        $jsonData = json_encode($results);
+                        echo $jsonData;
+
+                    } else {
+                        $results = array(
+                            "result" => "Error - data incomplete!",
+                        );
+
+                        $jsonData = json_encode($results);
+                        echo $jsonData;
+                    }
+                } else {
+                    $results = array(
+                        "result" => "Error - no data!",
+                    );
+
+                    $jsonData = json_encode($results);
+                    echo $jsonData;
+                }
+
+            }
+        }
+
+    }
+
+    function submitadd()
+    {
+
+        $this->SET_HEADER;   // 设置php CI 处理 CORS 自定义头部
+        //获取用所属的部门Id，用户处于多部门ID
+        if ($_SERVER["REQUEST_METHOD"] == 'POST') {   // 只处理post请求，否则options请求 500错误
+
+            // 检验token过期与否
+            // 过期返回跳转登录页面 返回403即可，
+            $token = $_SERVER["HTTP_X_AUTH_TOKEN"]; // 获取post请求过来的header token
+            $isExpired = $this->Api_model->isExpired($token);
+
+            if ($isExpired) {
+                $this->output->set_status_header(403);
+                echo '{"success": false,"message": "id auth failed 身份认证已失效，请重新登录" }';
+            } else {
+                // 处理post提交参数
+                $json_params = file_get_contents('php://input');
+                $postData = json_decode($json_params, true);
+
+                if (!empty($postData)) {
+                    if (!empty($postData['userId'])
+                        || !empty($postData['TableDesc'])
+                        || !empty($postData['RecordName'])
+                        || !empty($postData['Location'])
+                        || !empty($postData['Time'])
+                        || !empty($postData['task'])
+                        || !empty($postData['Zhuchi_man'])
+                        || !empty($postData['Record_man'])
+                        || !empty($postData['Chuxi_man'])
+                        || !empty($postData['Ycx_num'])
+                        || !empty($postData['Scx_num'])
+                        || !empty($postData['Quexi_man'])
+                        || !empty($postData['Quexi_reason'])
+                        || !empty($postData['Liexi_mans'])
+                        || !empty($postData['editorContent'])
+                    ) {
+                        $CreateMan = $postData['userId'];
+
+                        $TableDesc = $postData['TableDesc'];
+                        $RecordName = $postData['RecordName'];
+                        $Location = $postData['Location'];
+                        $Time = $postData['Time'];
+                        $Task = $postData['task'];
+                        $Zhuchi_man = $postData['Zhuchi_man'];
+                        $Record_man = $postData['Record_man'];
+                        $Chuxi_mans = $postData['Chuxi_man'];
+                        $Ycx_num = $postData['Ycx_num'];
+                        $Scx_num = $postData['Scx_num'];
+                        $Quexi_mans = $postData['Quexi_man'];
+                        $Quexi_reason = $postData['Quexi_reason'];
+                        $Liexi_mans = $postData['Liexi_mans'];
+                        $RecordText = $postData['editorContent'];
+
+                        $where = array(
+                            'RecordName' => $RecordName,
+                            'CreateMan' => $CreateMan
+                        );
+
+                        $isExist = $this->Bas->isExist('record', $where);
+
+                        if ($isExist) {
+                            $results = array(
+                                "result" => array('success' => false, 'message' => '会议议题重复！'),
+                            );
+
+                            $jsonData = json_encode($results);
+                            echo $jsonData;
+                            return;
+                        }
+
+
+                        $array = $this->Api_model->getDeptids_q($CreateMan);
+                        if (empty($array)) {
+                            $results = array(
+                                "result" => "Error - getDeptids_q() no data!",
+                            );
+
+                            $jsonData = json_encode($results);
+                            echo $jsonData;
+                            return;
+
+                        }
+
+                        $max = 10000;
+                        $j = 0;
+                        for ($i = 0; $i < count($array); $i++) {
+                            $arr = $this->Api_model->getDeptFatherId($array[$i]->DeptId);
+                            if (empty($array)) {
+                                $results = array(
+                                    "result" => "Error - getDeptFatherId() no data!",
+                                );
+
+                                $jsonData = json_encode($results);
+                                echo $jsonData;
+                                return;
+                            }
+
+                            $fid_length = count(explode(",", $arr[0]->FatherLst));
+
+                            if ($fid_length < $max) {
+                                $max = $fid_length;
+                                $j = $i;  // 指针父机构最小长度
+                            }
+                        }
+
+                        $CreateManDept = $array[$j]->DeptId;  // 最高机构ID
+
+                        $data = array(
+                            'RecordtblId' => $TableDesc,
+                            'taskId' => $Task,
+                            'RecordName' => $RecordName,
+                            'Zhuchi_man' => $Zhuchi_man,
+                            'Record_man' => $Record_man,
+                            'Time' => $Time,
+                            'Location' => $Location,
+                            'Quexi_reason' => $Quexi_reason,
+                            'Liexi_mans' => $Liexi_mans,
+                            'Ycx_num' => $Ycx_num,
+                            'Scx_num' => $Scx_num,
+                            'RecordText' => $RecordText,
+                            'CreateMan' => $CreateMan,
+                            'CreateManDept' => $CreateManDept,
+                        );
+
+
+                        $RetId = $this->Bas->saveAdd('record', $data);
+
+                        if ($RetId) {
+
+                            $results = array(
+                                "result" => array('success' => true, 'message' => '新增会议记录表成功！'),
+                            );
+
+                            $jsonData = json_encode($results);
+                            echo $jsonData;
+
+                            $this->loglib->addlog('新增会议记录表成功', serialize($data));
+
+                            // 添加出席人表
+                            if ($Chuxi_mans) {
+                                for ($i = 0; $i < count($Chuxi_mans); $i++) {
+                                    $dataarr = array(
+                                        'RecordId' => $RetId,
+                                        'ChuxiManId' => $Chuxi_mans[$i]
+                                    );
+                                    $ret = $this->Bas->saveAdd('record_chuximan', $dataarr);
+                                    if ($ret) {
+                                        $this->loglib->addlog('新增会议记录表(出席人)成功', serialize($dataarr));
+                                    } else {
+                                        $this->loglib->addlog('新增会议记录表(出席人)失败', serialize($dataarr));
+                                    }
+                                }
+                            }
+                            // 添加缺席人表
+                            if ($Quexi_mans) {
+                                for ($i = 0; $i < count($Quexi_mans); $i++) {
+                                    $dataarr = array(
+                                        'RecordId' => $RetId,
+                                        'QuexiManId' => $Quexi_mans[$i]
+                                    );
+                                    $ret = $this->Bas->saveAdd('record_queximan', $dataarr);
+                                    if ($ret) {
+                                        $this->loglib->addlog('新增会议记录表(缺席人)成功', serialize($dataarr));
+                                    } else {
+                                        $this->loglib->addlog('新增会议记录表(缺席人)失败', serialize($dataarr));
+                                    }
+                                }
+                            }
+
+
+                        } else {
+
+                            $results = array(
+                                "result" => array('success' => false, 'message' => '新增会议记录表失败！'),
+                            );
+
+                            $jsonData = json_encode($results);
+                            echo $jsonData;
+                            $this->loglib->addlog('新增会议记录表失败', serialize($data));
+                        }
+
+
+                    } else {
+                        $results = array(
+                            "result" => "Error - data incomplete!",
+                        );
+
+                        $jsonData = json_encode($results);
+                        echo $jsonData;
+                    }
+                } else {
+                    $results = array(
+                        "result" => "Error - no data!",
+                    );
+
+                    $jsonData = json_encode($results);
+                    echo $jsonData;
+                }
+
+            }
+        }
+
+    }
+
+    function readcount_jpdangke()
+    {
+        $this->SET_HEADER;   // 设置php CI 处理 CORS 自定义头部
+
+        if ($_SERVER["REQUEST_METHOD"] == 'POST') {   // 只处理post请求，否则options请求 500错误
+
+            // 检验token过期与否
+            // 过期返回跳转登录页面 返回403即可，
+            $token = $_SERVER["HTTP_X_AUTH_TOKEN"]; // 获取post请求过来的header token
+            $isExpired = $this->Api_model->isExpired($token);
+//            $isExpired = false;
+
+            if ($isExpired) {
+                $this->output->set_status_header(403);
+                echo '{"success": false,"message": "id auth failed 身份认证已失效，请重新登录" }';
+            } else {
+                // 处理post提交参数
+                $json_params = file_get_contents('php://input');
+                $data = json_decode($json_params, true);
+
+                if (!empty($data)) {
+                    if (!empty($data['id']) && !empty($data['current_cnt']) && !empty($data['table'])) {
+                        $ID = $data['id'];
+                        $CurrentCnt = $data['current_cnt'];
+                        $Table = $data['table'];
+                        $d = array(
+                            "ReadCnt" => $CurrentCnt + 1
+                        );
+                        $where = array(
+                            "Id" => $ID
+                        );
+                        $rows = $this->Bas->saveEdit($Table, $d, $where);
+                        $Success = $rows ? true : false;
+
+                        $results = array(
+                            "success" => $Success,
+                            "result" => $rows,
+                        );
+                        echo json_encode($results);
+
+                    } else {
+                        $results = array(
+                            "success" => false,
+                            "result" => "Error - data incomplete!",
+                        );
+
+                        $jsonData = json_encode($results);
+                        echo $jsonData;
+                    }
+                } else { // no data post
+                    $results = array(
+                        "success" => false,
+                        "result" => "Error - no data!",
+                    );
+                    $jsonData = json_encode($results);
+                    echo $jsonData;
+                }
+            }  // no expired end
+        }   // post method end
+    }
+
+    function readcount()
+    {
+        $this->SET_HEADER;   // 设置php CI 处理 CORS 自定义头部
+
+        if ($_SERVER["REQUEST_METHOD"] == 'POST') {   // 只处理post请求，否则options请求 500错误
+
+            // 检验token过期与否
+            // 过期返回跳转登录页面 返回403即可，
+            $token = $_SERVER["HTTP_X_AUTH_TOKEN"]; // 获取post请求过来的header token
+            $isExpired = $this->Api_model->isExpired($token);
+//            $isExpired = false;
+
+            if ($isExpired) {
+                $this->output->set_status_header(403);
+                echo '{"success": false,"message": "id auth failed 身份认证已失效，请重新登录" }';
+            } else {
+                // 处理post提交参数
+                $json_params = file_get_contents('php://input');
+                $data = json_decode($json_params, true);
+
+                if (!empty($data)) {
+                    if (!empty($data['id']) && !empty($data['current_cnt'])) {
+                        $ID = $data['id'];
+                        $CurrentCnt = $data['current_cnt'];
+
+                        $d = array(
+                            "READCOUNT" => $CurrentCnt + 1
+                        );
+                        $where = array(
+                            "ID" => $ID
+                        );
+                        $rows = $this->Bas->saveEdit('djxc', $d, $where);
+                        $Success = $rows ? true : false;
+
+                        $results = array(
+                            "success" => $Success,
+                            "result" => $rows,
+                        );
+                        echo json_encode($results);
+
+                    } else {
+                        $results = array(
+                            "success" => false,
+                            "result" => "Error - data incomplete!",
+                        );
+
+                        $jsonData = json_encode($results);
+                        echo $jsonData;
+                    }
+                } else { // no data post
+                    $results = array(
+                        "success" => false,
+                        "result" => "Error - no data!",
+                    );
+                    $jsonData = json_encode($results);
+                    echo $jsonData;
+                }
+            }  // no expired end
+        }   // post method end
+    }
+
+
+    /**
+     * 执行CURL请求，并封装返回对象
+     */
+    private function execCURL($ch)
+    {
+        $response = curl_exec($ch);
+        $error = curl_error($ch);
+        $result = array('header' => '',
+            'content' => '',
+            'curl_error' => '',
+            'http_code' => '',
+            'last_url' => '');
+
+        if ($error != "") {
+            $result['curl_error'] = $error;
+            return $result;
+        }
+
+        $header_size = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+        $result['header'] = str_replace(array("\r\n", "\r", "\n"), "<br/>", substr($response, 0, $header_size));
+        $result['content'] = substr($response, $header_size);
+        $result['http_code'] = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $result['last_url'] = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
+        $result["base_resp"] = array();
+        $result["base_resp"]["ret"] = $result['http_code'] == 200 ? 0 : $result['http_code'];
+        $result["base_resp"]["err_msg"] = $result['http_code'] == 200 ? "ok" : $result["curl_error"];
+
+        return $result;
+    }
+
+    /**
+     * GET 请求
+     * @param string $url
+     */
+    private function http_get($url)
+    {
+        $oCurl = curl_init();
+        if (stripos($url, "https://") !== FALSE) {
+            curl_setopt($oCurl, CURLOPT_SSL_VERIFYPEER, FALSE);
+            curl_setopt($oCurl, CURLOPT_SSL_VERIFYHOST, FALSE);
+            curl_setopt($oCurl, CURLOPT_SSLVERSION, 1); //CURL_SSLVERSION_TLSv1
+        }
+        curl_setopt($oCurl, CURLOPT_URL, $url);
+        curl_setopt($oCurl, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt($oCurl, CURLOPT_VERBOSE, 1);
+        curl_setopt($oCurl, CURLOPT_HEADER, 1);
+
+        // $sContent = curl_exec($oCurl);
+        // $aStatus = curl_getinfo($oCurl);
+        $sContent = $this->execCURL($oCurl);
+        curl_close($oCurl);
+
+        return $sContent;
+    }
+
+    /**
+     * POST 请求
+     * @param string $url
+     * @param array $param
+     * @param boolean $post_file 是否文件上传
+     * @return string content
+     */
+    private function http_post($url, $param, $post_file = false)
+    {
+        $oCurl = curl_init();
+
+        if (stripos($url, "https://") !== FALSE) {
+            curl_setopt($oCurl, CURLOPT_SSL_VERIFYPEER, FALSE);
+            curl_setopt($oCurl, CURLOPT_SSL_VERIFYHOST, false);
+            curl_setopt($oCurl, CURLOPT_SSLVERSION, 1); //CURL_SSLVERSION_TLSv1
+        }
+        if (PHP_VERSION_ID >= 50500 && class_exists('\CURLFile')) {
+            $is_curlFile = true;
+        } else {
+            $is_curlFile = false;
+            if (defined('CURLOPT_SAFE_UPLOAD')) {
+                curl_setopt($oCurl, CURLOPT_SAFE_UPLOAD, false);
+            }
+        }
+
+        if ($post_file) {
+            if ($is_curlFile) {
+                foreach ($param as $key => $val) {
+                    if (isset($val["tmp_name"])) {
+                        $param[$key] = new \CURLFile(realpath($val["tmp_name"]), $val["type"], $val["name"]);
+                    } else if (substr($val, 0, 1) == '@') {
+                        $param[$key] = new \CURLFile(realpath(substr($val, 1)));
+                    }
+                }
+            }
+            $strPOST = $param;
+        } else {
+            $strPOST = json_encode($param);
+        }
+
+        curl_setopt($oCurl, CURLOPT_URL, $url);
+        curl_setopt($oCurl, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt($oCurl, CURLOPT_POST, true);
+        curl_setopt($oCurl, CURLOPT_POSTFIELDS, $strPOST);
+        curl_setopt($oCurl, CURLOPT_VERBOSE, 1);
+        curl_setopt($oCurl, CURLOPT_HEADER, 1);
+
+        // $sContent = curl_exec($oCurl);
+        // $aStatus  = curl_getinfo($oCurl);
+
+        $sContent = $this->execCURL($oCurl);
+        curl_close($oCurl);
+
+        return $sContent;
+    }
+
+    function weixinAuth()
+    {
+        session_start();
+        if ($_SERVER["REQUEST_METHOD"] == 'OPTIONS') {
+            echo "options";
+            die();
+        }
+        $corpId = "ww89579c6928205114";
+        // $localAuthUrl = "http://dj.cttha.com:7000/hotcode/";
+        $agentId = "1000003";
+        $appSecret = "9f-VZWi6agTDgPXZQF3o0pLDkVAj0SXSO-ptfsTu7s4";
+        $localAuthUrl = "http://dj.cttha.com:7000/hotcode/";
+        if (!array_key_exists("code", $_REQUEST)) {
+            $redirectUri = urlencode("http://yw.cttha.com/ksh/get-corp-weixin-code.html?redirect_uri=" . urlencode($localAuthUrl));
+            $authUrl = "https://open.weixin.qq.com/connect/oauth2/authorize?appid=" . $corpId . "&redirect_uri=" . $redirectUri . "&response_type=code&scope=snsapi_privateinfo&agentid=" . $agentId . "&state=STATE#wechat_redirect";
+            echo json_encode(array("success" => false, "authUrl" => $authUrl));
+            die();
+        }
+        $getCorpAccessTokenUrl = "https://qyapi.weixin.qq.com/cgi-bin/gettoken?corpid=" . $corpId . "&corpsecret=" . $appSecret;
+        $accessToken = "";
+        if (false && $_SESSION["weixinAuth_accessToken"] && $_SESSION["weixinAuth_tokenTime"] && $_SESSION["weixinAuth_tokenExpires"] && time() - intval($_SESSION["weixinAuth_tokenTime"]) < intval($_SESSION["tokenExpires"])) {
+            $accessToken = $_SESSION["weixinAuth_accessToken"];
+        } else {
+            $tokenInfo = $this->http_get($getCorpAccessTokenUrl);
+            $tokenInfo = json_decode($tokenInfo["content"], true);
+            if ($tokenInfo["errcode"] == 0) {
+                $accessToken = $tokenInfo["access_token"];
+                $_SESSION["weixinAuth_accessToke"] = $accessToken;
+                $_SESSION["weixinAuth_tokenTime"] = time();
+                $_SESSION["weixinAuth_tokenExpires"] = $tokenInfo["expires_in"];
+            } else {
+                echo json_encode(array("success" => false, "msg" => $tokenInfo["errmsg"] ? $tokenInfo["errmsg"] : "企业认证失败!"));
+                die();
+            }
+        }
+        $getUserIdUrl = "https://qyapi.weixin.qq.com/cgi-bin/user/getuserinfo?access_token=" . $accessToken . "&code=" . $_REQUEST["code"];
+        $ajaxUserIdInfo = $this->http_get($getUserIdUrl);
+        // var_dump($ajaxUserIdInfo);die();
+        $userIdInfo = json_decode($ajaxUserIdInfo["content"], true);
+        if ($userIdInfo["errcode"] == 0) {
+            if (array_key_exists("OpenId", $userIdInfo)) {
+                echo json_encode(array("success" => false, "msg" => "不是企业成员!请联系企业管理员,添加您的账号的企业通讯录!"));
+                die();
+                // next(U.error("不是企业成员!请联系企业管理员,添加您的账号的企业通讯录!"));
+            } else if (array_key_exists("UserId", $userIdInfo)) {
+                $getUserInfoUrl = "https://qyapi.weixin.qq.com/cgi-bin/user/getuserdetail?access_token=" . $accessToken;
+                // 44468cd93cdfefb8a7f911b5e1f7dfd0
+                $data = array("user_ticket" => $userIdInfo["user_ticket"]);
+                $ajaxUserInfo = $this->http_post($getUserInfoUrl, $data);
+                $userInfo = json_decode($ajaxUserInfo["content"], true);
+                if ($userInfo["errcode"] == 0) {
+                    $user = $this->Api_model->getUserByWxUserId($userIdInfo["UserId"]);
+                    if ($user["success"]) {
+                        echo json_encode($this->saveLoginInfo($user['userinfo']));
+                        die();
+                    } else {
+                        $_SESSION["wxUserInfo"] = $userInfo;
+                        echo json_encode(array("sessionid" => session_id(), "status" => -1, "success" => false, "msg" => "此微信账号(" . $userInfo["name"] . ")没有与系统账号关联,请用您的账号密码登录一次，完成首次绑定!"));
+                        die();
+                    }
+                    return;
+                } else {
+                    echo json_encode(array("success" => false, "msg" => $userInfo["errmsg"]));
+                    die();
+                }
+            }
+        } else {
+            echo json_encode(array("success" => false, "msg" => $userIdInfo["errmsg"]));
+            die();
+        }
+    }
+}
+
+/* End of file welcome.php */
+/* Location: ./application/controllers/welcome.php */
