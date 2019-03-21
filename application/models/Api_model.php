@@ -9,41 +9,44 @@ class Api_model extends CI_Model
         $this->load->database();
     }
 
-
-
-
-    function saveAdd($table,$data)
+    function saveAdd($table, $data)
     {
-        $this->db->insert($table,$data);
+        $this->db->insert($table, $data);
         return $this->db->insert_id();
     }
 
-    function saveEdit($table,$data,$where)
+    function saveEdit($table, $data, $where)
     {
         $this->db->where($where);
-        $this->db->update($table,$data);
+        $this->db->update($table, $data);
         return $this->db->affected_rows();
     }
 
-    function isExist($table,$where)
+    function isExist($table, $where)
     {
         $this->db->where($where);
         $this->db->from($table);
         return $this->db->count_all_results();
     }
 
-    function saveDel($table,$where)
+    function saveDel($table, $where)
     {
         $this->db->where($where);
         $this->db->delete($table);
         return $this->db->affected_rows();
     }
 
-    function select($table,$select='',$where='',$order='')
+    function select($table, $select = '', $where = '', $order = '')
     {
-        if ($select) { $this->db->select($select); }
-        if ($where) { $this->db->where($where); }
-        if ($order) { $this->db->order_by($order); }
+        if ($select) {
+            $this->db->select($select);
+        }
+        if ($where) {
+            $this->db->where($where);
+        }
+        if ($order) {
+            $this->db->order_by($order);
+        }
 
         $query = $this->db->get($table);
         return $query->result();
@@ -51,17 +54,103 @@ class Api_model extends CI_Model
 
     }
 
-    function total($table,$field,$keyword)
+    function total($table, $field, $keyword)
     {
-        $sql="select count(*) numrows from $table where $field like '%$keyword%' ";
-        $query=$this->db->query($sql);
-        if( ($query->row_array())==null ){
+        $sql = "select count(*) numrows from $table where $field like '%$keyword%' ";
+        $query = $this->db->query($sql);
+        if (($query->row_array()) == null) {
             return 0;
-        }else
-        {
-            $result=$query->result_array();
+        } else {
+            $result = $query->result_array();
             return $result;
         }
+    }
+
+    // 生成菜单树 $type = true 时，带控件按钮
+    function getMenuTree($token, $type)
+    {
+//        $token 根据token 获取用户 id
+
+        $hasCtrl = $type ? "" : " AND m.type != 2 ";
+
+        $sql = "SELECT DISTINCT
+                    m.id,
+                    m.pid,
+                    m.name,
+                    m.path,
+                    m.component,
+                    m.type,
+                    m.title,
+                    m.icon,
+                    m.redirect,
+                    m.hidden,
+                    m.listorder
+                FROM
+                    sys_menu m,
+                    sys_user u,
+                    sys_user_role ur,
+                    sys_role_perm rm
+                WHERE
+                    m.id = rm.perm_id
+                AND ur.role_id = rm.role_id
+                AND ur.user_id = u.id
+                AND m.`status` = 1 " . $hasCtrl .
+            " AND u.id = 1
+                    ORDER BY
+                        m.listorder";
+
+        $query = $this->db->query($sql);
+
+        return $query->result_array();
+    }
+
+    // 新建编辑菜单时，下拉选项，配置父节点操作
+    function getMenuTreeOptions()
+    {
+        $sql = "SELECT DISTINCT
+                    m.id,
+                    m.pid,
+                    m.title
+                FROM
+                    sys_menu m,
+                    sys_user u,
+                    sys_user_role ur,
+                    sys_role_perm rm
+                WHERE
+                    m.id = rm.perm_id
+                AND ur.role_id = rm.role_id
+                AND ur.user_id = u.id
+                AND m.`status` = 1 
+                AND m.type != 2 
+                AND u.id = 1
+                    ORDER BY
+                        m.listorder";
+
+        $query = $this->db->query($sql);
+
+        return $query->result_array();
+    }
+
+    function getCtrlPerm($token)
+    {
+        $sql = "SELECT DISTINCT
+                    m.path
+                 FROM
+                    sys_menu m,
+                    sys_user u,
+                    sys_user_role ur,
+                    sys_role_perm rm
+                WHERE
+                    m.id = rm.perm_id
+                AND ur.role_id = rm.role_id
+                AND ur.user_id = u.id
+                AND m.`status` = 1 
+                AND m.type = 2 
+                AND u.id = 1";
+
+        $query = $this->db->query($sql);
+
+        return $query->result_array();
     }
 
     function saveUserWxUserId($id, $wxUserId, $wxUserName)

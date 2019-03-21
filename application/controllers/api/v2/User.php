@@ -165,6 +165,11 @@ class User extends REST_Controller
     {
 //        $result = $this->some_model();
         $result['success'] = TRUE;
+        $token = 'admin-token';
+
+        $MenuTreeArr = $this->Api_model->getMenuTree($token, false);
+        $asyncRouterMap = $this->treelib->genVueRouter($MenuTreeArr, 'id', 'pid', 0);
+        $CtrlPerm= $this->Api_model->getCtrlPerm($token);
 
         // 获取用户信息成功
         if ($result['success']) {
@@ -175,89 +180,92 @@ class User extends REST_Controller
                 "name" => "Super Admin",
                 "identify" => "410000000000000000",
                 "phone" => "13633838282",
-                "ctrlperm" => [
-                    [
-                        "path" => "/sys/menu/view"
-                    ],
-                    [
-                        "path" => "/sys/menu/add"
-                    ],
-                    [
-                        "path" => "/sys/menu/edit"
-                    ],
-                    [
-                        "path" => "/sys/menu/del"
-                    ],
-                    [
-                        "path" => "/sys/menu/download"
-                    ]
-                ],
-                "asyncRouterMap" => [
-                [
-                    "path" => '/sys',
-                    "name" => 'sys',
-                    "meta" => [
-                        "title" => "系统管理",
-                        "icon" => "sysset2"
-                    ],
-                    "component" => 'Layout',
-                    "redirect" => '/sys/menu',
-                    "children" => [
-                        [
-                            "path" => '/sys/menu',
-                            "name" => 'menu',
-                            "meta" => [
-                                "title" => "菜单管理",
-                                "icon" => "menu1"
-                            ],
-                            "component" => 'sys/menu/index',
-                            "redirect" => '',
-                            "children" => [
+                "ctrlperm" => $CtrlPerm,
 
-                            ]
-                        ],
-                        [
-                            "path" => '/sys/user',
-                            "name" => 'user',
-                            "meta" => [
-                                "title" => "用户管理",
-                                "icon" => "user"
-                            ],
-                            "component" => 'pdf/index',
-                            "redirect" => '',
-                            "children" => [
-
-                            ]
-                        ],
-                        [
-                            "path" => '/sys/icon',
-                            "name" => 'icon',
-                            "meta" => [
-                                "title" => "图标管理",
-                                "icon" => "icon"
-                            ],
-                            "component" => 'svg-icons/index',
-                            "redirect" => '',
-                            "children" => [
-
-                            ]
-                        ]
-                    ]
-                ],
-                    [
-                        "path" => '/sysx',
-                        "name" => 'sysx',
-                        "meta" => [
-                            "title" => "其他管理",
-                            "icon" => "plane"
-                        ],
-                        "component" => 'Layout',
-                        "redirect" => '',
-                        "children" => [
-
-                        ]
-                    ]
-                ]
+//                "ctrlperm" => [
+//                    [
+//                        "path" => "/sys/menu/view"
+//                    ],
+//                    [
+//                        "path" => "/sys/menu/add"
+//                    ],
+//                    [
+//                        "path" => "/sys/menu/edit"
+//                    ],
+//                    [
+//                        "path" => "/sys/menu/del"
+//                    ],
+//                    [
+//                        "path" => "/sys/menu/download"
+//                    ]
+//                ],
+                "asyncRouterMap" => $asyncRouterMap
+//                "asyncRouterMap" => [
+//                [
+//                    "path" => '/sys',
+//                    "name" => 'sys',
+//                    "meta" => [
+//                        "title" => "系统管理",
+//                        "icon" => "sysset2"
+//                    ],
+//                    "component" => 'Layout',
+//                    "redirect" => '/sys/menu',
+//                    "children" => [
+//                        [
+//                            "path" => '/sys/menu',
+//                            "name" => 'menu',
+//                            "meta" => [
+//                                "title" => "菜单管理",
+//                                "icon" => "menu1"
+//                            ],
+//                            "component" => 'sys/menu/index',
+//                            "redirect" => '',
+//                            "children" => [
+//
+//                            ]
+//                        ],
+//                        [
+//                            "path" => '/sys/user',
+//                            "name" => 'user',
+//                            "meta" => [
+//                                "title" => "用户管理",
+//                                "icon" => "user"
+//                            ],
+//                            "component" => 'pdf/index',
+//                            "redirect" => '',
+//                            "children" => [
+//
+//                            ]
+//                        ],
+//                        [
+//                            "path" => '/sys/icon',
+//                            "name" => 'icon',
+//                            "meta" => [
+//                                "title" => "图标管理",
+//                                "icon" => "icon"
+//                            ],
+//                            "component" => 'svg-icons/index',
+//                            "redirect" => '',
+//                            "children" => [
+//
+//                            ]
+//                        ]
+//                    ]
+//                ],
+//                    [
+//                        "path" => '/sysx',
+//                        "name" => 'sysx',
+//                        "meta" => [
+//                            "title" => "其他管理",
+//                            "icon" => "plane"
+//                        ],
+//                        "component" => 'Layout',
+//                        "redirect" => '',
+//                        "children" => [
+//
+//                        ]
+//                    ]
+//                ]
             ];
 
             $message = [
