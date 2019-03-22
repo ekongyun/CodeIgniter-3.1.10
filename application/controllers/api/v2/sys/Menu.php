@@ -16,10 +16,9 @@ class Menu extends REST_Controller
     function __construct()
     {
         parent::__construct();
-        $this->load->model('Api_model');
-//        $this->load->model('Record_model');
-//        $this->load->model('Dept_model', 'Dept');
-//        $this->config->load('config', true);
+        $this->load->model('Base_model');
+        $this->load->model('Menu_model');
+        // $this->config->load('config', true);
     }
 
     public function index_get()
@@ -92,25 +91,125 @@ class Menu extends REST_Controller
         //         var_dump($parms);
         //         var_dump($parms['path']);
 
-        $result = $this->Api_model->saveAdd('sys_menu', $parms);
+        // 参数检验/数据预处理
+        // 菜单类型为目录
+        if (!$parms['type']) {
+            $parms['component'] = 'Layout';
+        }
 
-        if (!$result) {
-            $message = [
-                "code" => 20000,
-                "type" => 'error',
-                "message" => $parms['title'] . '-菜单添加失败.'
-            ];
-            $this->set_response($message, REST_Controller::HTTP_OK);
-        } else {
+        $result = $this->Base_model->_insert_key('sys_menu', $parms);
+        if ($result) {
             // 超级管理员角色自动拥有该菜单功能
-            $this->Api_model->saveAdd('sys_role_perm', ["role_id" => 1, "perm_id" => $result]);
+            $this->Base_model->_insert_key('sys_role_perm', ["role_id" => 1, "perm_id" => $result]);
 
             $message = [
                 "code" => 20000,
                 "type" => 'success',
-                "message" => $parms['title'] . '-菜单添加成功.'
+                "message" => $parms['title'] . ' - 菜单添加成功'
             ];
             $this->set_response($message, REST_Controller::HTTP_OK);
+        } else {
+            $message = [
+                "code" => 20000,
+                "type" => 'error',
+                "message" => $parms['title'] . ' - 菜单添加失败'
+            ];
+            $this->set_response($message, REST_Controller::HTTP_OK);
+        }
+    }
+
+    // 菜单更新操作
+    function edit_post()
+    {
+        // 根据token 判断 用户 api url 操作权限
+        // var_dump($this->uri->uri_string); // string(19) "api/v2/sys/menu/add"
+        // hasperm();
+
+        // $id = $this->post('id'); // POST param
+        $parms = $this->post();  // 获取表单参数，类型为数组
+        // var_dump($parms['path']);
+
+        // 参数检验/数据预处理
+        if ($parms['id'] == $parms['pid']) {
+            $message = [
+                "code" => 20000,
+                "type" => 'error',
+                "message" => '父节点不能是自己'
+            ];
+            $this->set_response($message, REST_Controller::HTTP_OK);
+        }
+        // 菜单类型为目录
+        if ($parms['type'] == 0) {
+            $parms['component'] = 'Layout';
+        }
+        // 菜单类型为功能按钮时
+        if ($parms['type'] == 2) {
+            $parms['component'] = '';
+            $parms['icon'] = '';
+        }
+
+        $id = $parms['id'];
+        unset($parms['id']); // 择出索引id
+        $where = ["id" => $id];
+
+        if ($this->Base_model->_update_key('sys_menu', $parms, $where)) {
+            $message = [
+                "code" => 20000,
+                "type" => 'success',
+                "message" => $parms['title'] . ' - 菜单更新成功'
+            ];
+            $this->set_response($message, REST_Controller::HTTP_OK);
+        } else {
+            $message = [
+                "code" => 20000,
+                "type" => 'error',
+                "message" => $parms['title'] . ' - 菜单更新错误'
+            ];
+            $this->set_response($message, REST_Controller::HTTP_OK);
+        }
+    }
+
+    // 菜单删除操作
+    function del_post()
+    {
+        // 根据token 判断 用户 api url 操作权限
+        // var_dump($this->uri->uri_string); // string(19) "api/v2/sys/menu/add"
+        // hasperm();
+
+        $parms = $this->post();  // 获取表单参数，类型为数组
+        // var_dump($parms['path']);
+
+        // 参数检验/数据预处理
+        // 存在子节点 不能删除返回
+        $hasChild = $this->Menu_model->hasChild($parms['id']);
+
+        if ($hasChild) {
+            $message = [
+                "code" => 20000,
+                "type" => 'error',
+                "message" => $parms['title'] . ' - 存在子节点不能删除'
+            ];
+            $this->set_response($message, REST_Controller::HTTP_OK);
+        } else {
+            // 删除外键关联表 sys_role_perm
+            $this->Base_model->_delete_key('sys_role_perm', ['perm_id' => $parms['id']]);
+
+            // 删除基础表 sys_menu
+            if ($this->Base_model->_delete_key('sys_menu', $parms)) {
+                $message = [
+                    "code" => 20000,
+                    "type" => 'success',
+                    "message" => $parms['title'] . ' - 菜单删除成功'
+                ];
+                $this->set_response($message, REST_Controller::HTTP_OK);
+            } else {
+                $message = [
+                    "code" => 20000,
+                    "type" => 'error',
+                    "message" => $parms['title'] . ' - 菜单删除错误'
+                ];
+                $this->set_response($message, REST_Controller::HTTP_OK);
+            }
         }
     }
 
@@ -121,7 +220,7 @@ class Menu extends REST_Controller
         // var_dump($this->uri->uri_string); // string(19) "api/v2/sys/menu/add"
         // hasperm();
         $token = 'admin-token';
-        $MenuTreeArr = $this->Api_model->getMenuTree($token, true);
+        $MenuTreeArr = $this->Menu_model->getMenuTree($token, true);
         $MenuTree = $this->treelib->genVueMenuTree($MenuTreeArr, 'id', 'pid', 0);
         $message = [
             "code" => 20000,
@@ -130,14 +229,14 @@ class Menu extends REST_Controller
         $this->set_response($message, REST_Controller::HTTP_OK);
     }
 
-    // 根据token拉取菜单树
+    // 根据token拉取 treeselect 下拉选项菜单
     function treeoptions_get()
     {
         // 根据token 判断用户 api url 操作权限
         // var_dump($this->uri->uri_string); // string(19) "api/v2/sys/menu/add"
         // hasperm();
         $token = 'admin-token';
-        $MenuTreeArr = $this->Api_model->getMenuTreeOptions($token);
+        $MenuTreeArr = $this->Menu_model->getMenuTreeOptions($token);
         array_unshift($MenuTreeArr, ['id' => 0, 'pid' => -1, 'title' => '顶级菜单']);
         $MenuTree = $this->treelib->genVueMenuTree($MenuTreeArr, 'id', 'pid', -1);
 

@@ -16,7 +16,7 @@ class Article extends REST_Controller
     function __construct()
     {
         parent::__construct();
-        $this->load->model('Api_model');
+        $this->load->model('Base_model');
 //        $this->load->model('Record_model');
 //        $this->load->model('Dept_model', 'Dept');
 //        $this->config->load('config', true);

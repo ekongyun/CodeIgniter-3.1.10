@@ -168,42 +168,6 @@ class Treelib
         return $tree;
     }
 
-
-    public function getMenuArray($data, $idKey, $fidKey, $root)
-    {
-        if ($idKey) $this->idKey = $idKey;
-        if ($fidKey) $this->fidKey = $fidKey;
-        if ($root) $this->root = $root;
-        if ($data) {
-            $this->data = $data;
-            $this->getSubMenu($this->root);
-        }
-
-        //去掉键名
-        $b = array_values($this->treeArray);
-
-        return "{basic:" . json_encode($b) . "}";
-
-    }
-
-    private function getSubMenu($root)
-    {
-        $menus = '';
-        foreach ($this->data as &$node) {
-            if ($root == $node[$this->fidKey]) {
-                $node['menus'] = $this->getSubMenu($node[$this->idKey]);
-                $menus[] = $node;
-            }
-            //只要一级节点
-            if ($this->root == $node[$this->fidKey]) {
-                $this->treeArray[$node[$this->idKey]] = $node;
-            }
-        }
-        return $menus;
-
-    }
-
-
     /*
        * 获取全部机构
        * TODO：根据当前USERID 获取用户最高级机构所有下属机构

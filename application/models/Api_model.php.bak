@@ -1,35 +1,45 @@
 <?php if (!defined('BASEPATH')) exit('No direct script access allowed');
 
-class Api_model extends CI_Model
+class Base_model extends CI_Model
 {
-
+    /*
+     * 通用数据库操作方法 增删改查
+     */
     function __construct()
     {
         parent::__construct();
         $this->load->database();
     }
 
-    function saveAdd($table, $data)
+    function _get_key($key)
+    {
+        return $this->rest->db
+            ->where(config_item('rest_key_column'), $key)
+            ->get(config_item('rest_keys_table'))
+            ->row();
+    }
+
+    function _insert_key($table, $data)
     {
         $this->db->insert($table, $data);
         return $this->db->insert_id();
     }
 
-    function saveEdit($table, $data, $where)
+    function _update_key($table, $data, $where)
     {
         $this->db->where($where);
         $this->db->update($table, $data);
         return $this->db->affected_rows();
     }
 
-    function isExist($table, $where)
+    function _key_exists($table, $where)
     {
         $this->db->where($where);
         $this->db->from($table);
         return $this->db->count_all_results();
     }
 
-    function saveDel($table, $where)
+    function _delete_key($table, $where)
     {
         $this->db->where($where);
         $this->db->delete($table);
@@ -50,7 +60,6 @@ class Api_model extends CI_Model
 
         $query = $this->db->get($table);
         return $query->result();
-
 
     }
 
@@ -127,7 +136,6 @@ class Api_model extends CI_Model
                         m.listorder";
 
         $query = $this->db->query($sql);
-
         return $query->result_array();
     }
 

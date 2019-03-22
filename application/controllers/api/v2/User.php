@@ -16,7 +16,8 @@ class User extends REST_Controller
     function __construct()
     {
         parent::__construct();
-        $this->load->model('Api_model');
+        $this->load->model('Base_model');
+        $this->load->model('Menu_model');
 //        $this->load->model('Record_model');
 //        $this->load->model('Dept_model', 'Dept');
 //        $this->config->load('config', true);
@@ -130,7 +131,6 @@ class User extends REST_Controller
             ->update('auth', $data);
     }
 
-
     function login_post()
     {
         $username = $this->post('username'); // POST param
@@ -139,7 +139,7 @@ class User extends REST_Controller
 //        var_dump($password);
         $input_account = $username;
         $input_password = md5($password);
-        //        $result = $this->Api_model->app_user_login_validate($input_account, $input_password);
+        //  $result = $this->Api_model->app_user_login_validate($input_account, $input_password);
         // 用户名密码正确 生成token 返回
         if (1) {
             $token = $this->_generate_token();
@@ -167,9 +167,9 @@ class User extends REST_Controller
         $result['success'] = TRUE;
         $token = 'admin-token';
 
-        $MenuTreeArr = $this->Api_model->getMenuTree($token, false);
+        $MenuTreeArr = $this->Menu_model->getMenuTree($token, false);
         $asyncRouterMap = $this->treelib->genVueRouter($MenuTreeArr, 'id', 'pid', 0);
-        $CtrlPerm= $this->Api_model->getCtrlPerm($token);
+        $CtrlPerm= $this->Menu_model->getCtrlPerm($token);
 
         // 获取用户信息成功
         if ($result['success']) {

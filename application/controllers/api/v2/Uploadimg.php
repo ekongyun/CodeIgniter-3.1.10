@@ -18,7 +18,7 @@ class Uploadimg extends REST_Controller
     function __construct()
     {
         parent::__construct();
-        $this->load->model('Api_model');
+        $this->load->model('Base_model');
     }
 
 
@@ -301,7 +301,7 @@ class Uploadimg extends REST_Controller
             'check' => '待审核'
         ];
 
-        $result = $this->Api_model->saveEdit('upload_tbl', $data, $where);
+        $result = $this->Base_model->_update_key('upload_tbl', $data, $where);
 
         if ($result) {
             $message = [
