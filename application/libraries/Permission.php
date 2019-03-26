@@ -1,12 +1,12 @@
 <?php if (!defined('BASEPATH')) exit('No direct script access allowed');
 
 /**
- * Tree Class
+ * Permission Class
  *
- * 转换EasyuiTree函数
+ *  基础权限类，及生成树类
  *
  */
-class Treelib
+class Permission
 {
 
     private $idKey = 'id';            //主键的键名
@@ -66,6 +66,52 @@ class Treelib
             }
         }
         return $children;
+    }
+
+    /*
+     * @parms，$type 根据$perm_type = 'menu'时，判断是否菜单带有功能控件
+     * return array
+     */
+    function getPermission($token, $perm_type, $menuCtrl = true)
+    {
+        $CI = &get_instance();
+        $CI->load->model('Base_model');
+
+        $BasetblArr = $CI->Base_model->getBaseTable($perm_type);
+        if (empty($BasetblArr)) {
+            var_dump($this->uri->uri_string . '$this->Base_model->getBaseTable 获取基础表失败...');
+            return;
+        }
+        $tblname = $BasetblArr[0]['r_table'];
+
+        $PermArr = $CI->Base_model->getPerm($tblname, $token, $perm_type, $menuCtrl);
+
+        return $PermArr;
+    }
+
+    /*
+     * @parms， 根据$token获取拥有的菜单功能按钮控件权限 与vue前台perm.js 配合判断按钮隐藏与否
+     * return array
+     */
+    function getMenuCtrlPerm($token)
+    {
+        $CI = &get_instance();
+        $CI->load->model('Base_model');
+        $PermArr = $CI->Base_model->getCtrlPerm($token);
+        // 返回样例
+        //        array(2) {
+        //        [0]=>
+        //          array(1) {
+        //            ["path"]=>
+        //            string(13) "/sys/menu/add"
+        //          }
+        //          [1]=>
+        //          array(1) {
+        //            ["path"]=>
+        //            string(14) "/sys/menu/edit"
+        //          }
+        //        }
+        return $PermArr;
     }
 
     /*
@@ -129,8 +175,8 @@ class Treelib
     }
 
     /*
-     * 将数据格式化成树形结构
-     */
+    * 将数据格式化成树形结构
+    */
     function genTree($data, $idKey, $fidKey, $pId)
     {
 //        $tree = '';
