@@ -17,7 +17,6 @@ class User extends REST_Controller
     {
         parent::__construct();
         $this->load->model('Base_model');
-        $this->load->model('Menu_model');
 //        $this->load->model('Record_model');
 //        $this->load->model('Dept_model', 'Dept');
 //        $this->config->load('config', true);
@@ -167,9 +166,9 @@ class User extends REST_Controller
         $result['success'] = TRUE;
         $token = 'admin-token';
 
-        $MenuTreeArr = $this->Menu_model->getMenuTree($token, false);
-        $asyncRouterMap = $this->treelib->genVueRouter($MenuTreeArr, 'id', 'pid', 0);
-        $CtrlPerm= $this->Menu_model->getCtrlPerm($token);
+        $MenuTreeArr = $this->permission->getPermission($token, 'menu', false);
+        $asyncRouterMap = $this->permission->genVueRouter($MenuTreeArr, 'id', 'pid', 0);
+        $CtrlPerm = $this->permission->getMenuCtrlPerm($token);
 
         // 获取用户信息成功
         if ($result['success']) {
@@ -181,7 +180,6 @@ class User extends REST_Controller
                 "identify" => "410000000000000000",
                 "phone" => "13633838282",
                 "ctrlperm" => $CtrlPerm,
-
 //                "ctrlperm" => [
 //                    [
 //                        "path" => "/sys/menu/view"

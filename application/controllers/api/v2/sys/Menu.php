@@ -17,7 +17,6 @@ class Menu extends REST_Controller
     {
         parent::__construct();
         $this->load->model('Base_model');
-        $this->load->model('Menu_model');
         // $this->config->load('config', true);
     }
 
@@ -25,6 +24,26 @@ class Menu extends REST_Controller
     {
         $this->load->view('login_view');
     }
+
+    public function insertx_post()
+    {
+        // $id = $this->post('id'); // POST param
+        $parms = $this->post();  // 获取表单参数，类型为数组
+        var_dump($parms);
+        $result = $this->Base_model->_insert_key('sys_role_perm', $parms);
+        var_dump($result);
+    }
+
+    public function gettest_post()
+    {
+        $result = $this->Base_model->_get_key('sys_perm', 'perm_type,r_id rid', 'perm_type="role" and r_id=1');
+        var_dump($result);
+        var_dump($result[0]['perm_type']);
+        var_dump($this->uri->uri_string);
+        var_dump($this->uri);
+
+    }
+
 
     public function testapi_get()
     {
@@ -97,25 +116,39 @@ class Menu extends REST_Controller
             $parms['component'] = 'Layout';
         }
 
-        $result = $this->Base_model->_insert_key('sys_menu', $parms);
-        if ($result) {
-            // 超级管理员角色自动拥有该菜单功能
-            $this->Base_model->_insert_key('sys_role_perm', ["role_id" => 1, "perm_id" => $result]);
-
-            $message = [
-                "code" => 20000,
-                "type" => 'success',
-                "message" => $parms['title'] . ' - 菜单添加成功'
-            ];
-            $this->set_response($message, REST_Controller::HTTP_OK);
-        } else {
+        $menu_id = $this->Base_model->_insert_key('sys_menu', $parms);
+        if (!$menu_id) {
             $message = [
                 "code" => 20000,
                 "type" => 'error',
                 "message" => $parms['title'] . ' - 菜单添加失败'
             ];
             $this->set_response($message, REST_Controller::HTTP_OK);
+            return;
         }
+
+        // 生成该菜单对应的权限: sys_perm, 权限类型为: menu, 生成唯一的 perm_id
+        $perm_id = $this->Base_model->_insert_key('sys_perm', ['perm_type' => 'menu', "r_id" => $menu_id]);
+        if (!$perm_id) {
+            var_dump($this->uri->uri_string .' 生成该菜单对应的权限: sys_perm, 失败...');
+            var_dump(['perm_type' => 'menu', "r_id" => $menu_id]);
+            return;
+        }
+
+        // 超级管理员角色自动拥有该权限 perm_id
+        $role_perm_id = $this->Base_model->_insert_key('sys_role_perm', ["role_id" => 1, "perm_id" => $perm_id]);
+        if (!$role_perm_id) {
+            var_dump($this->uri->uri_string . ' 超级管理员角色自动拥有该权限 perm_id, 失败...');
+            var_dump(["role_id" => 1, "perm_id" => $perm_id]);
+            return;
+        }
+
+        $message = [
+            "code" => 20000,
+            "type" => 'success',
+            "message" => $parms['title'] . ' - 菜单添加成功'
+        ];
+        $this->set_response($message, REST_Controller::HTTP_OK);
     }
 
     // 菜单更新操作
@@ -152,21 +185,22 @@ class Menu extends REST_Controller
         unset($parms['id']); // 择出索引id
         $where = ["id" => $id];
 
-        if ($this->Base_model->_update_key('sys_menu', $parms, $where)) {
-            $message = [
-                "code" => 20000,
-                "type" => 'success',
-                "message" => $parms['title'] . ' - 菜单更新成功'
-            ];
-            $this->set_response($message, REST_Controller::HTTP_OK);
-        } else {
+        if (!$this->Base_model->_update_key('sys_menu', $parms, $where)) {
             $message = [
                 "code" => 20000,
                 "type" => 'error',
                 "message" => $parms['title'] . ' - 菜单更新错误'
             ];
             $this->set_response($message, REST_Controller::HTTP_OK);
+            return;
         }
+
+        $message = [
+            "code" => 20000,
+            "type" => 'success',
+            "message" => $parms['title'] . ' - 菜单更新成功'
+        ];
+        $this->set_response($message, REST_Controller::HTTP_OK);
     }
 
     // 菜单删除操作
@@ -181,8 +215,7 @@ class Menu extends REST_Controller
 
         // 参数检验/数据预处理
         // 存在子节点 不能删除返回
-        $hasChild = $this->Menu_model->hasChild($parms['id']);
-
+        $hasChild = $this->Base_model->hasChild($parms['id']);
         if ($hasChild) {
             $message = [
                 "code" => 20000,
@@ -190,27 +223,44 @@ class Menu extends REST_Controller
                 "message" => $parms['title'] . ' - 存在子节点不能删除'
             ];
             $this->set_response($message, REST_Controller::HTTP_OK);
-        } else {
-            // 删除外键关联表 sys_role_perm
-            $this->Base_model->_delete_key('sys_role_perm', ['perm_id' => $parms['id']]);
-
-            // 删除基础表 sys_menu
-            if ($this->Base_model->_delete_key('sys_menu', $parms)) {
-                $message = [
-                    "code" => 20000,
-                    "type" => 'success',
-                    "message" => $parms['title'] . ' - 菜单删除成功'
-                ];
-                $this->set_response($message, REST_Controller::HTTP_OK);
-            } else {
-                $message = [
-                    "code" => 20000,
-                    "type" => 'error',
-                    "message" => $parms['title'] . ' - 菜单删除错误'
-                ];
-                $this->set_response($message, REST_Controller::HTTP_OK);
-            }
+            return;
         }
+
+        // 删除外键关联表 sys_role_perm , sys_perm, sys_menu
+        // 1. 根据sys_menu id及'menu' 查找 perm_id
+        // 2. 删除sys_role_perm 中perm_id记录
+        // 3. 删除sys_perm中 perm_type='menu' and r_id = menu_id 记录,即第1步中获取的 perm_id， 一一对应
+        // 4. 删除sys_menu 中 id = menu_id 的记录
+        $where = 'perm_type="menu" and r_id=' . $parms['id'];
+        $arr = $this->Base_model->_get_key('sys_perm', '*', $where);
+        if (empty($arr)) {
+            var_dump($this->uri->uri_string . ' 未查找到 sys_perm 表中记录');
+            var_dump($where);
+            return;
+        }
+
+        $perm_id = $arr[0]['id']; // 正常只有一条记录
+        $this->Base_model->_delete_key('sys_role_perm', ['perm_id' => $perm_id]);
+        $this->Base_model->_delete_key('sys_perm', ['id' => $perm_id]);
+
+        // 删除基础表 sys_menu
+        if (!$this->Base_model->_delete_key('sys_menu', $parms)) {
+            $message = [
+                "code" => 20000,
+                "type" => 'error',
+                "message" => $parms['title'] . ' - 菜单删除错误'
+            ];
+            $this->set_response($message, REST_Controller::HTTP_OK);
+            return;
+        }
+
+        $message = [
+            "code" => 20000,
+            "type" => 'success',
+            "message" => $parms['title'] . ' - 菜单删除成功'
+        ];
+        $this->set_response($message, REST_Controller::HTTP_OK);
+
     }
 
     // 根据token拉取菜单树
@@ -220,8 +270,8 @@ class Menu extends REST_Controller
         // var_dump($this->uri->uri_string); // string(19) "api/v2/sys/menu/add"
         // hasperm();
         $token = 'admin-token';
-        $MenuTreeArr = $this->Menu_model->getMenuTree($token, true);
-        $MenuTree = $this->treelib->genVueMenuTree($MenuTreeArr, 'id', 'pid', 0);
+        $MenuTreeArr = $this->permission->getPermission($token, 'menu', true);
+        $MenuTree = $this->permission->genVueMenuTree($MenuTreeArr, 'id', 'pid', 0);
         $message = [
             "code" => 20000,
             "data" => $MenuTree,
@@ -236,9 +286,9 @@ class Menu extends REST_Controller
         // var_dump($this->uri->uri_string); // string(19) "api/v2/sys/menu/add"
         // hasperm();
         $token = 'admin-token';
-        $MenuTreeArr = $this->Menu_model->getMenuTreeOptions($token);
+        $MenuTreeArr = $this->permission->getPermission($token, 'menu', false);
         array_unshift($MenuTreeArr, ['id' => 0, 'pid' => -1, 'title' => '顶级菜单']);
-        $MenuTree = $this->treelib->genVueMenuTree($MenuTreeArr, 'id', 'pid', -1);
+        $MenuTree = $this->permission->genVueMenuTree($MenuTreeArr, 'id', 'pid', -1);
 
         $message = [
             "code" => 20000,
