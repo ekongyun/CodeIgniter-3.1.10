@@ -98,12 +98,16 @@ class Menu extends REST_Controller
 //        一般加载到时model里面使用。
     }
 
-    // 菜单添加操作
+    // 增
     function add_post()
     {
-        // 根据token 判断 用户 api url 操作权限
-        // var_dump($this->uri->uri_string); // string(19) "api/v2/sys/menu/add"
-        // hasperm();
+        $uri = $this->uri->uri_string;
+        $Token = $this->input->get_request_header('X-Token', TRUE);
+        $retPerm = $this->permission->HasPermit($Token, $uri);
+        if ($retPerm['code'] != 50000) {
+            $this->set_response($retPerm, REST_Controller::HTTP_OK);
+            return;
+        }
 
         // $id = $this->post('id'); // POST param
         $parms = $this->post();  // 获取表单参数，类型为数组
@@ -130,7 +134,7 @@ class Menu extends REST_Controller
         // 生成该菜单对应的权限: sys_perm, 权限类型为: menu, 生成唯一的 perm_id
         $perm_id = $this->Base_model->_insert_key('sys_perm', ['perm_type' => 'menu', "r_id" => $menu_id]);
         if (!$perm_id) {
-            var_dump($this->uri->uri_string .' 生成该菜单对应的权限: sys_perm, 失败...');
+            var_dump($this->uri->uri_string . ' 生成该菜单对应的权限: sys_perm, 失败...');
             var_dump(['perm_type' => 'menu', "r_id" => $menu_id]);
             return;
         }
@@ -151,12 +155,16 @@ class Menu extends REST_Controller
         $this->set_response($message, REST_Controller::HTTP_OK);
     }
 
-    // 菜单更新操作
+    // 改
     function edit_post()
     {
-        // 根据token 判断 用户 api url 操作权限
-        // var_dump($this->uri->uri_string); // string(19) "api/v2/sys/menu/add"
-        // hasperm();
+        $uri = $this->uri->uri_string;
+        $Token = $this->input->get_request_header('X-Token', TRUE);
+        $retPerm = $this->permission->HasPermit($Token, $uri);
+        if ($retPerm['code'] != 50000) {
+            $this->set_response($retPerm, REST_Controller::HTTP_OK);
+            return;
+        }
 
         // $id = $this->post('id'); // POST param
         $parms = $this->post();  // 获取表单参数，类型为数组
@@ -203,12 +211,16 @@ class Menu extends REST_Controller
         $this->set_response($message, REST_Controller::HTTP_OK);
     }
 
-    // 菜单删除操作
+    // 删
     function del_post()
     {
-        // 根据token 判断 用户 api url 操作权限
-        // var_dump($this->uri->uri_string); // string(19) "api/v2/sys/menu/add"
-        // hasperm();
+        $uri = $this->uri->uri_string;
+        $Token = $this->input->get_request_header('X-Token', TRUE);
+        $retPerm = $this->permission->HasPermit($Token, $uri);
+        if ($retPerm['code'] != 50000) {
+            $this->set_response($retPerm, REST_Controller::HTTP_OK);
+            return;
+        }
 
         $parms = $this->post();  // 获取表单参数，类型为数组
         // var_dump($parms['path']);
@@ -263,14 +275,19 @@ class Menu extends REST_Controller
 
     }
 
-    // 根据token拉取菜单树
+    // 查
     function info_get()
     {
-        // 根据token 判断 用户 api url 操作权限
-        // var_dump($this->uri->uri_string); // string(19) "api/v2/sys/menu/add"
-        // hasperm();
-        $token = 'admin-token';
-        $MenuTreeArr = $this->permission->getPermission($token, 'menu', true);
+        $uri = $this->uri->uri_string;
+        $Token = $this->input->get_request_header('X-Token', TRUE);
+
+        $retPerm = $this->permission->HasPermit($Token, $uri);
+        if ($retPerm['code'] != 50000) {
+            $this->set_response($retPerm, REST_Controller::HTTP_OK);
+            return;
+        }
+
+        $MenuTreeArr = $this->permission->getPermission($Token, 'menu', true);
         $MenuTree = $this->permission->genVueMenuTree($MenuTreeArr, 'id', 'pid', 0);
         $message = [
             "code" => 20000,
@@ -282,11 +299,9 @@ class Menu extends REST_Controller
     // 根据token拉取 treeselect 下拉选项菜单
     function treeoptions_get()
     {
-        // 根据token 判断用户 api url 操作权限
-        // var_dump($this->uri->uri_string); // string(19) "api/v2/sys/menu/add"
-        // hasperm();
-        $token = 'admin-token';
-        $MenuTreeArr = $this->permission->getPermission($token, 'menu', false);
+        $Token = $this->input->get_request_header('X-Token', TRUE);
+
+        $MenuTreeArr = $this->permission->getPermission($Token, 'menu', false);
         array_unshift($MenuTreeArr, ['id' => 0, 'pid' => -1, 'title' => '顶级菜单']);
         $MenuTree = $this->permission->genVueMenuTree($MenuTreeArr, 'id', 'pid', -1);
 

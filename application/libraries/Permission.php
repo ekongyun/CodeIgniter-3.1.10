@@ -68,7 +68,7 @@ class Permission
         return $children;
     }
 
-    /*
+    /**
      * @parms，$type 根据$perm_type = 'menu'时，判断是否菜单带有功能控件
      * return array
      */
@@ -89,7 +89,7 @@ class Permission
         return $PermArr;
     }
 
-    /*
+    /**
      * @parms， 根据$token获取拥有的菜单功能按钮控件权限 与vue前台perm.js 配合判断按钮隐藏与否
      * return array
      */
@@ -114,9 +114,57 @@ class Permission
         return $PermArr;
     }
 
-    /*
-    * 将数据格式化成树形结构路由菜单
-    */
+    /**
+     * 后端根据 $token,$uri 判断是否该用户是否过期及拥有的功能按钮控件操作权限
+     * 增/删/改/查 控制器引用
+     * @parms $token,$uri
+     * return Array
+     * return ['code' => 50008, 'message' => "非法的token"];
+     * return ['code' => 50014, 'message' => "Token 过期了"];
+     * return ['code' => 50016, 'message' => "无操作权限"];
+     * return ['code' => 50000, 'message' => "有操作权限"];
+     */
+    function HasPermit($token, $uri)
+    {
+        $CI = &get_instance();
+        $CI->load->model('Base_model');
+        // 50008:非法的token; 50012:其他客户端登录了;  50014:Token 过期了;
+        $tokenArr = $CI->Base_model->TokenExpired($token);
+
+        if ($tokenArr['code'] != 20000) {
+            return $tokenArr;
+        }
+
+        $PermArr = $CI->Base_model->getCtrlPerm($token);
+        // getCtrlPerm 返回样例
+        //        array(2) {
+        //        [0]=>
+        //          array(1) {
+        //            ["path"]=>
+        //            string(13) "/sys/menu/add"
+        //          }
+        //          [1]=>
+        //          array(1) {
+        //            ["path"]=>
+        //            string(14) "/sys/menu/edit"
+        //          }
+        //        }
+        if (empty($PermArr)) {
+            return ['code' => 50016, 'message' => "无操作权限 " . $uri, 'data' => $PermArr];
+        }
+
+        // var_dump($this->uri->uri_string); // string(19) "api/v2/sys/menu/add"
+        foreach ($PermArr as $k => $v) {
+            if (strpos($uri, $v['path'])) {
+                return ['code' => 50000, 'message' => "有操作权限 " . $uri, 'data' => $PermArr];
+            }
+        }
+        return ['code' => 50016, 'message' => "无操作权限 " . $uri, 'data' => $PermArr];
+    }
+
+    /**
+     * 将数据格式化成树形结构路由菜单
+     */
     function genVueRouter($data, $idKey, $fidKey, $pId)
     {
         $tree = array();
@@ -174,9 +222,9 @@ class Permission
         return $tree;
     }
 
-    /*
-    * 将数据格式化成树形结构
-    */
+    /**
+     * 将数据格式化成树形结构
+     */
     function genTree($data, $idKey, $fidKey, $pId)
     {
 //        $tree = '';
@@ -214,10 +262,10 @@ class Permission
         return $tree;
     }
 
-    /*
-       * 获取全部机构
-       * TODO：根据当前USERID 获取用户最高级机构所有下属机构
-       */
+    /**
+     * 获取全部机构
+     * TODO：根据当前USERID 获取用户最高级机构所有下属机构
+     */
     function getDept()
     {
         $CI = &get_instance();

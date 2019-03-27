@@ -110,17 +110,16 @@ class User extends REST_Controller
     {
         return $this->rest->db
                 ->where('token', $token)
-                ->count_all_results('auth') > 0;
+                ->count_all_results('sys_user_token') > 0;
     }
 
     private function _insert_token($token, $data)
     {
         $data['token'] = $token;
-        $data['date_created'] = function_exists('now') ? now() : time();
 
         return $this->rest->db
             ->set($data)
-            ->insert('auth');
+            ->insert('sys_user_token');
     }
 
     private function _update_token($token, $data)
@@ -141,12 +140,29 @@ class User extends REST_Controller
         //  $result = $this->Api_model->app_user_login_validate($input_account, $input_password);
         // 用户名密码正确 生成token 返回
         if (1) {
-            $token = $this->_generate_token();
-//              "token" => $token
+            $Token = $this->_generate_token();
+            $create_time = time();
+            $expire_time = $create_time + 2 * 60 * 60;  // 2小时过期
+
+            $data = [
+                'user_id' => 1, // test 登录时 model 获取
+                'expire_time' => $expire_time,
+                'create_time' => $create_time
+            ];
+
+            if (!$this->_insert_token($Token, $data)) {
+                $message = [
+                    "code" => 20000,
+                    "message" => 'Token 创建失败, 请联系管理员.'
+                ];
+                $this->set_response($message, REST_Controller::HTTP_OK);
+                return;
+            }
+
             $message = [
                 "code" => 20000,
                 "data" => [
-                    "token" => "admin-token"
+                    "token" => $Token
                 ]
             ];
             $this->set_response($message, REST_Controller::HTTP_OK);
@@ -164,11 +180,11 @@ class User extends REST_Controller
     {
 //        $result = $this->some_model();
         $result['success'] = TRUE;
-        $token = 'admin-token';
+        $Token = $this->input->get_request_header('X-Token', TRUE);
 
-        $MenuTreeArr = $this->permission->getPermission($token, 'menu', false);
+        $MenuTreeArr = $this->permission->getPermission($Token, 'menu', false);
         $asyncRouterMap = $this->permission->genVueRouter($MenuTreeArr, 'id', 'pid', 0);
-        $CtrlPerm = $this->permission->getMenuCtrlPerm($token);
+        $CtrlPerm = $this->permission->getMenuCtrlPerm($Token);
 
         // 获取用户信息成功
         if ($result['success']) {

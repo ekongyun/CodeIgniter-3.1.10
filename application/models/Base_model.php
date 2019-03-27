@@ -78,7 +78,7 @@ class Base_model extends CI_Model
         }
     }
 
-    /* 根据perm_type 获取关联的基础表名称
+    /** 根据perm_type 获取关联的基础表名称
      * @return array
      */
     function getBaseTable($perm_type)
@@ -88,9 +88,9 @@ class Base_model extends CI_Model
         return $query->result_array();
     }
 
-    /*
+    /**
      *  根据token, perm_type 获取 perm_id,perm_type,r_id
-     *  @return array
+     * @return array
      */
     function getPerm($basetable, $token, $perm_type, $menuCtrl)
     {
@@ -115,7 +115,7 @@ class Base_model extends CI_Model
                             AND p.id = rp.perm_id
                             AND p.perm_type = '" . $perm_type . "'
                         ) t
-                    LEFT JOIN " . $basetable. " basetbl ON t.r_id = basetbl.id" . $hasCtrl ." order by basetbl.listorder" ;
+                    LEFT JOIN " . $basetable . " basetbl ON t.r_id = basetbl.id" . $hasCtrl . " order by basetbl.listorder";
 
         $query = $this->db->query($sql);
         return $query->result_array();
@@ -149,7 +149,7 @@ class Base_model extends CI_Model
         return $query->result_array();
     }
 
-    /*
+    /**
      * 菜单是否拥有子节点
      */
     function hasChildMenu($id)
@@ -167,4 +167,38 @@ class Base_model extends CI_Model
         }
     }
 
+    /**
+     * 判断 token 是否过期
+     * // 50008:非法的token; 50012:其他客户端登录了;  50014:Token 过期了;
+     */
+    function TokenExpired($token)
+    {
+        $sql = "SELECT
+                *
+            FROM
+                `sys_user_token`
+            WHERE
+                token = '$token'";
+        $query = $this->db->query($sql);
+        $Arr = $query->result_array();
+        if (empty($Arr)) {
+            return ['code' => 50008, 'message' => "非法的token"];
+        }
+
+        $now = time();
+        if ($now > $Arr[0]['expire_time']) {
+            return ['code' => 50014, 'message' => "Token 过期了"];
+        }
+
+        // TODO: 当token合法时，自动续期?
+        $update_time = time();
+        $expire_time = $update_time + 2 * 60 * 60;  // 2小时过期
+        $data = [
+            'expire_time' => $expire_time,
+            'last_update_time' => $update_time
+        ];
+        $this->_update_key('sys_user_token', $data, ['token' => $token]);
+
+        return ['code' => 20000, 'message' => "Token 合法"];
+    }
 }
