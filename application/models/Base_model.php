@@ -4,7 +4,7 @@ class Base_model extends CI_Model
 {
     /*
      * 1. 通用数据库操作方法 增删改查
-     * 2. 部分权限
+     * 2. 部分权限 菜单/角色
      */
     function __construct()
     {
@@ -12,8 +12,10 @@ class Base_model extends CI_Model
         $this->load->database();
     }
 
-
-    /*
+    /************************
+     * 数据库操作模型部分
+     ***********************/
+    /**
      * 获取值
      * $table: 表名
      * $select: 查找项， $select = '*' 或 $select = 'id,title'
@@ -77,6 +79,13 @@ class Base_model extends CI_Model
             return $result;
         }
     }
+    /************************
+     * 数据库操作模型部分结束
+     ***********************/
+
+    /************************
+     * 权限模型部分
+     ***********************/
 
     /** 根据perm_type 获取关联的基础表名称
      * @return array
@@ -107,12 +116,15 @@ class Base_model extends CI_Model
                                 sys_user_token ut,
                                 sys_user_role ur,
                                 sys_role_perm rp,
-                                sys_perm p
+                                sys_perm p,
+			                    sys_role r
                             WHERE
                                 ut.token = '" . $token . "'
                             AND ur.user_id = ut.user_id
                             AND rp.role_id = ur.role_id
                             AND p.id = rp.perm_id
+                            AND r.id = ur.role_id
+                            AND r.status=1
                             AND p.perm_type = '" . $perm_type . "'
                         ) t
                     LEFT JOIN " . $basetable . " basetbl ON t.r_id = basetbl.id" . $hasCtrl . " order by basetbl.listorder";
@@ -134,12 +146,15 @@ class Base_model extends CI_Model
                                 sys_user_token ut,
                                 sys_user_role ur,
                                 sys_role_perm rp,
-                                sys_perm p
+                                sys_perm p,
+			                    sys_role r
                             WHERE
                                 ut.token = '" . $token . "'
                             AND ur.user_id = ut.user_id
                             AND rp.role_id = ur.role_id
                             AND p.id = rp.perm_id
+                            AND r.id = ur.role_id
+                            AND r.status=1
                             AND p.perm_type = 'menu'
                         ) t
                     LEFT JOIN  sys_menu basetbl ON t.r_id = basetbl.id 
@@ -149,23 +164,6 @@ class Base_model extends CI_Model
         return $query->result_array();
     }
 
-    /**
-     * 菜单是否拥有子节点
-     */
-    function hasChildMenu($id)
-    {
-        $sql = "SELECT getChildLst(" . $id . ") children";
-        $query = $this->db->query($sql);
-        // var_dump($query->result_array()[0]["children"]);
-        // string(14) "$,2,5,6,8,9,10"
-        $array = explode(",", $query->result_array()[0]["children"]);
-
-        if (count($array) > 2) {
-            return true;
-        } else {
-            return false;
-        }
-    }
 
     /**
      * 判断 token 是否过期
@@ -201,4 +199,53 @@ class Base_model extends CI_Model
 
         return ['code' => 20000, 'message' => "Token 合法"];
     }
+
+    /***********************
+     * 权限模型部分结束
+     ***********************/
+
+    /************************
+     * 菜单模型部分
+     ************************/
+
+    /**
+     * 菜单是否拥有子节点
+     */
+    function hasChildMenu($id)
+    {
+        $sql = "SELECT getChildLst(" . $id . ") children";
+        $query = $this->db->query($sql);
+        // var_dump($query->result_array()[0]["children"]);
+        // string(14) "$,2,5,6,8,9,10"
+        $array = explode(",", $query->result_array()[0]["children"]);
+
+        if (count($array) > 2) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    /***********************
+     * 菜单模型部分结束
+     ***********************/
+
+
+    /***********************
+     * 角色模型部分
+     ************************/
+
+    /**
+     * 获取角色列表
+     */
+    function getRoleList()
+    {
+        $sql = "SELECT * FROM sys_role ORDER BY listorder";
+        $query = $this->db->query($sql);
+        return $query->result_array();
+    }
+
+    /***********************
+     * 角色模型部分结束
+     ***********************/
 }
