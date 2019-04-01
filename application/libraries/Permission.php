@@ -69,6 +69,7 @@ class Permission
     }
 
     /**
+     * 根据 $token ， 权限类型 获取该 token->userid->role 对应的所有权限
      * @parms，$type 根据$perm_type = 'menu'时，判断是否菜单带有功能控件
      * return array
      */
@@ -220,6 +221,32 @@ class Permission
             }
         }
         return $tree;
+    }
+
+    /**
+     * 指定格式两个二维数组比较差集
+     * @param $array1
+     * @param $array2
+     * @return array
+     */
+    // $arr1 = [
+    // ['role_id'=>1,'perm_id'=>1],
+    // ['role_id'=>1,'perm_id'=>2]
+    // ];
+    function array_diff_assoc2($array1, $array2) {
+        $ret = array();
+        foreach ($array1 as $k => $v) {
+#               var_dump($v);
+            $isExist=false;
+            foreach($array2 as $k2=> $v2) {
+                if(empty(array_diff_assoc($v,$v2))){
+                    $isExist=true;
+                    break;
+                }
+            }
+            if(!$isExist) array_push($ret,$v);
+        }
+        return $ret;
     }
 
     /**

@@ -294,18 +294,111 @@ class Role extends REST_Controller
         $this->set_response($message, REST_Controller::HTTP_OK);
     }
 
-    // 根据token拉取 treeselect 下拉选项菜单
-    function treeoptions_get()
+    // 获取所有菜单 不需权限验证
+    function allmenus_get()
     {
-        $Token = $this->input->get_request_header('X-Token', TRUE);
+        $MenuTreeArr = $this->Base_model->getAllMenus();
+        if (empty($MenuTreeArr)) {
+            $message = [
+                "code" => 20000,
+                "data" => $MenuTreeArr,
+                "message" => "数据库表中没有菜单"
+            ];
+            $this->set_response($message, REST_Controller::HTTP_OK);
+            return;
+        }
 
-        $MenuTreeArr = $this->permission->getPermission($Token, 'menu', false);
-        array_unshift($MenuTreeArr, ['id' => 0, 'pid' => -1, 'title' => '顶级菜单']);
-        $MenuTree = $this->permission->genVueMenuTree($MenuTreeArr, 'id', 'pid', -1);
-
+        $MenuTree = $this->permission->genVueMenuTree($MenuTreeArr, 'id', 'pid', 0);
         $message = [
             "code" => 20000,
             "data" => $MenuTree,
+        ];
+        $this->set_response($message, REST_Controller::HTTP_OK);
+    }
+
+    //  获取角色对应菜单 不需权限验证
+    function rolemenu_post()
+    {
+        $parms = $this->post();  // 获取表单参数，类型为数组
+        $RoleId = $parms['roleId'];
+
+        $MenuTreeArr = $this->Base_model->getRoleMenu($RoleId);
+        $message = [
+            "code" => 20000,
+            "data" => $MenuTreeArr,
+        ];
+        $this->set_response($message, REST_Controller::HTTP_OK);
+    }
+
+    // 保存角色对应权限
+    function saveroleperm_post()
+    {
+        $parms = $this->post();  // 获取表单参数，类型为数组
+        //        var_dump($parms['roleId']);
+        //        var_dump($parms['rolePerms']);
+        // 参数检验/数据预处理
+        // 超级管理员角色不允许删除
+        if ($parms['roleId'] == 1) {
+            $message = [
+                "code" => 20000,
+                "type" => 'error',
+                "message" => '超级管理员角色拥有所有权限，不允许修改！'
+            ];
+            $this->set_response($message, REST_Controller::HTTP_OK);
+            return;
+        }
+
+        $RolePermArr = $this->Base_model->getRolePerm($parms['roleId']);
+
+        $AddArr = $this->permission->array_diff_assoc2($parms['rolePerms'], $RolePermArr);
+        // var_dump('------------只存在于前台传参 做添加操作-------------');
+        // var_dump($AddArr);
+        $failed = false;
+        $failedArr = [];
+        foreach ($AddArr as $k => $v) {
+            $ret = $this->Base_model->_insert_key('sys_role_perm', $v);
+            if (!$ret) {
+                $failed = true;
+                array_push($failedArr, $v);
+            }
+        }
+        if ($failed) {
+            $message = [
+                "code" => 20000,
+                "type" => 'error',
+                "message" => '授权失败 ' . json_encode($failedArr)
+            ];
+            $this->set_response($message, REST_Controller::HTTP_OK);
+            return;
+        }
+
+        $DelArr = $this->permission->array_diff_assoc2($RolePermArr, $parms['rolePerms']);
+        // var_dump('------------只存在于后台数据库 删除操作-------------');
+        // var_dump($DelArr);
+        $failed = false;
+        $failedArr = [];
+        foreach ($DelArr as $k => $v) {
+            $ret = $this->Base_model->_delete_key('sys_role_perm', $v);
+            if (!$ret) {
+                $failed = true;
+                array_push($failedArr, $v);
+            }
+        }
+        if ($failed) {
+            $message = [
+                "code" => 20000,
+                "type" => 'error',
+                "message" => '授权失败 ' . json_encode($failedArr)
+            ];
+            $this->set_response($message, REST_Controller::HTTP_OK);
+            return;
+        }
+
+        $message = [
+            "code" => 20000,
+            "type" => 'success',
+            "data" => $parms,
+            "message" => '授权操作成功',
         ];
         $this->set_response($message, REST_Controller::HTTP_OK);
     }

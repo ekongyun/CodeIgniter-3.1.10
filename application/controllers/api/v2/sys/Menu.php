@@ -299,6 +299,16 @@ class Menu extends REST_Controller
     // 根据token拉取 treeselect 下拉选项菜单
     function treeoptions_get()
     {
+        // 此 uri 可不做权限/token过期验证，则在菜单里，可以不加入此项路由path /sys/menu/treeoptions。
+        //
+        //        $uri = $this->uri->uri_string;
+        //        $Token = $this->input->get_request_header('X-Token', TRUE);
+        //        $retPerm = $this->permission->HasPermit($Token, $uri);
+        //        if ($retPerm['code'] != 50000) {
+        //            $this->set_response($retPerm, REST_Controller::HTTP_OK);
+        //            return;
+        //        }
+
         $Token = $this->input->get_request_header('X-Token', TRUE);
 
         $MenuTreeArr = $this->permission->getPermission($Token, 'menu', false);

@@ -245,6 +245,58 @@ class Base_model extends CI_Model
         return $query->result_array();
     }
 
+    /**
+     *  获取所有菜单并加入对应的权限id
+     */
+    function getAllMenus()
+    {
+        $sql = "SELECT
+                    p.id perm_id,
+                    m.*
+                FROM
+                    sys_menu m,
+                    sys_perm p
+                WHERE
+                    p.perm_type = 'menu'
+                AND p.r_id = m.id
+                ORDER BY
+                    m.listorder";
+        $query = $this->db->query($sql);
+        return $query->result_array();
+    }
+
+    function getRoleMenu($RoleId)
+    {
+        $sql = "SELECT
+                    p.id perm_id,
+                    m.*
+                FROM
+                    sys_menu m,
+                    sys_perm p,
+                    sys_role_perm rp
+                WHERE
+                    rp.perm_id = p.id
+                AND p.perm_type = 'menu'
+                AND p.r_id = m.id
+                AND rp.role_id = ". $RoleId ."
+                ORDER BY
+                    m.listorder";
+        $query = $this->db->query($sql);
+        return $query->result_array();
+    }
+
+    function getRolePerm($RoleId)
+    {
+        $sql = "SELECT
+                    role_id, perm_id
+                FROM
+                    sys_role_perm
+                WHERE
+                    role_id =" . $RoleId;
+        $query = $this->db->query($sql);
+        return $query->result_array();
+    }
+
     /***********************
      * 角色模型部分结束
      ***********************/
