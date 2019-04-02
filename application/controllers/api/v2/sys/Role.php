@@ -315,8 +315,28 @@ class Role extends REST_Controller
         ];
         $this->set_response($message, REST_Controller::HTTP_OK);
     }
+    // 获取所有角色带perm_id 不需权限验证
+    function allroles_get()
+    {
+        $AllRolesArr = $this->Base_model->getAllRoles();
+        if (empty($AllRolesArr)) {
+            $message = [
+                "code" => 20000,
+                "data" => $AllRolesArr,
+                "message" => "数据库表中没有角色"
+            ];
+            $this->set_response($message, REST_Controller::HTTP_OK);
+            return;
+        }
 
-    //  获取角色对应菜单 不需权限验证
+        $message = [
+            "code" => 20000,
+            "data" => $AllRolesArr,
+        ];
+        $this->set_response($message, REST_Controller::HTTP_OK);
+    }
+
+    //  获取角色拥有的菜单权限 不需权限验证
     function rolemenu_post()
     {
         $parms = $this->post();  // 获取表单参数，类型为数组
@@ -326,6 +346,20 @@ class Role extends REST_Controller
         $message = [
             "code" => 20000,
             "data" => $MenuTreeArr,
+        ];
+        $this->set_response($message, REST_Controller::HTTP_OK);
+    }
+
+    // 获取角色拥有的角色权限 不需权限验证
+    function rolerole_post()
+    {
+        $parms = $this->post();  // 获取表单参数，类型为数组
+        $RoleId = $parms['roleId'];
+
+        $RoleRoleArr = $this->Base_model->getRoleRole($RoleId);
+        $message = [
+            "code" => 20000,
+            "data" => $RoleRoleArr,
         ];
         $this->set_response($message, REST_Controller::HTTP_OK);
     }
