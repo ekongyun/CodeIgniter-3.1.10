@@ -17,6 +17,7 @@ class Role extends REST_Controller
     {
         parent::__construct();
         $this->load->model('Base_model');
+        $this->load->model('Role_model');
         // $this->config->load('config', true);
     }
 
@@ -275,7 +276,7 @@ class Role extends REST_Controller
     }
 
     // 查
-    function info_get()
+    function view_post()
     {
         $uri = $this->uri->uri_string;
         $Token = $this->input->get_request_header('X-Token', TRUE);
@@ -286,7 +287,7 @@ class Role extends REST_Controller
             return;
         }
 
-        $RoleArr = $this->Base_model->getRoleList();
+        $RoleArr = $this->Role_model->getRoleList();
         $message = [
             "code" => 20000,
             "data" => $RoleArr,
@@ -297,7 +298,7 @@ class Role extends REST_Controller
     // 获取所有菜单 不需权限验证
     function allmenus_get()
     {
-        $MenuTreeArr = $this->Base_model->getAllMenus();
+        $MenuTreeArr = $this->Role_model->getAllMenus();
         if (empty($MenuTreeArr)) {
             $message = [
                 "code" => 20000,
@@ -318,7 +319,7 @@ class Role extends REST_Controller
     // 获取所有角色带perm_id 不需权限验证
     function allroles_get()
     {
-        $AllRolesArr = $this->Base_model->getAllRoles();
+        $AllRolesArr = $this->Role_model->getAllRoles();
         if (empty($AllRolesArr)) {
             $message = [
                 "code" => 20000,
@@ -342,7 +343,7 @@ class Role extends REST_Controller
         $parms = $this->post();  // 获取表单参数，类型为数组
         $RoleId = $parms['roleId'];
 
-        $MenuTreeArr = $this->Base_model->getRoleMenu($RoleId);
+        $MenuTreeArr = $this->Role_model->getRoleMenu($RoleId);
         $message = [
             "code" => 20000,
             "data" => $MenuTreeArr,
@@ -356,7 +357,7 @@ class Role extends REST_Controller
         $parms = $this->post();  // 获取表单参数，类型为数组
         $RoleId = $parms['roleId'];
 
-        $RoleRoleArr = $this->Base_model->getRoleRole($RoleId);
+        $RoleRoleArr = $this->Role_model->getRoleRole($RoleId);
         $message = [
             "code" => 20000,
             "data" => $RoleRoleArr,
@@ -382,7 +383,7 @@ class Role extends REST_Controller
             return;
         }
 
-        $RolePermArr = $this->Base_model->getRolePerm($parms['roleId']);
+        $RolePermArr = $this->Role_model->getRolePerm($parms['roleId']);
 
         $AddArr = $this->permission->array_diff_assoc2($parms['rolePerms'], $RolePermArr);
         // var_dump('------------只存在于前台传参 做添加操作-------------');

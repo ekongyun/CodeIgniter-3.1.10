@@ -17,7 +17,7 @@ class User extends REST_Controller
     {
         parent::__construct();
         $this->load->model('Base_model');
-//        $this->load->model('Record_model');
+        $this->load->model('User_model');
 //        $this->load->model('Dept_model', 'Dept');
 //        $this->config->load('config', true);
     }
@@ -127,6 +127,39 @@ class User extends REST_Controller
         return $this->rest->db
             ->where('token', $token)
             ->update('auth', $data);
+    }
+
+    // 查
+    function view_post()
+    {
+        $uri = $this->uri->uri_string;
+        $Token = $this->input->get_request_header('X-Token', TRUE);
+
+        $retPerm = $this->permission->HasPermit($Token, $uri);
+        if ($retPerm['code'] != 50000) {
+            $this->set_response($retPerm, REST_Controller::HTTP_OK);
+            return;
+        }
+
+        $UserArr = $this->User_model->getUserList();
+        $message = [
+            "code" => 20000,
+            "data" => $UserArr,
+        ];
+        $this->set_response($message, REST_Controller::HTTP_OK);
+    }
+
+    function getroleoptions_get()
+    {
+
+        $Token = $this->input->get_request_header('X-Token', TRUE);
+
+        $RoleArr = $this->User_model->getRoleOptions($Token);
+        $message = [
+            "code" => 20000,
+            "data" => $RoleArr,
+        ];
+        $this->set_response($message, REST_Controller::HTTP_OK);
     }
 
     function login_post()

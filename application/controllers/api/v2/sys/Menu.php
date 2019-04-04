@@ -227,7 +227,7 @@ class Menu extends REST_Controller
 
         // 参数检验/数据预处理
         // 存在子节点 不能删除返回
-        $hasChild = $this->Base_model->hasChild($parms['id']);
+        $hasChild = $this->Base_model->hasChildMenu($parms['id']);
         if ($hasChild) {
             $message = [
                 "code" => 20000,
@@ -276,7 +276,7 @@ class Menu extends REST_Controller
     }
 
     // 查
-    function info_get()
+    function view_post()
     {
         $uri = $this->uri->uri_string;
         $Token = $this->input->get_request_header('X-Token', TRUE);
