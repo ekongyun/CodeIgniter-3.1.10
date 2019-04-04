@@ -31,7 +31,7 @@ class User_model extends CI_Model
     }
 
     /**
-     * 根据 $token 获取该用户所拥有的角色类权限选项
+     * 根据 $token 获取对应Token用户所拥有的角色类权限选项 新增时使用
      */
     function getRoleOptions($Token)
     {
@@ -58,8 +58,49 @@ class User_model extends CI_Model
                 AND r. STATUS = 1
                 order by r.listorder";
         $query = $this->db->query($sql);
-        return  $query->result_array();
+        return $query->result_array();
     }
+    /**
+     * 根据 用户ID 获取该用户被分配的角色 编辑时使用
+     *
+     */
+    function getUserRoles($Id)
+    {
+        $sql = "SELECT
+                    r.id,
+                    r.name,
+                    r.remark,
+                    r.status
+                FROM
+                    sys_user_role ur,
+                    sys_role r
+                WHERE
+                    ur.role_id = r.id
+                AND ur.user_id =" . $Id;
+
+        $query = $this->db->query($sql);
+        return $query->result_array();
+    }
+
+    /**
+     * 根据 用户ID 获取该用户所拥有的角色
+     * [
+     * ['user_id'=> 1, 'role_id'=>1]
+     * ...
+     * ]
+     */
+    function getRolesByUserId($Id)
+    {
+        $sql = "SELECT
+                    ur.user_id,ur.role_id
+                FROM
+                    sys_user_role ur
+                 WHERE ur.user_id=" . $Id;
+
+        $query = $this->db->query($sql);
+        return $query->result_array();
+    }
+
 
     /***********************
      * 用户模型部分结束

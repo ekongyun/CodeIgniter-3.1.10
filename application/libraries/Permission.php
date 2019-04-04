@@ -233,18 +233,19 @@ class Permission
     // ['role_id'=>1,'perm_id'=>1],
     // ['role_id'=>1,'perm_id'=>2]
     // ];
-    function array_diff_assoc2($array1, $array2) {
+    function array_diff_assoc2($array1, $array2)
+    {
         $ret = array();
         foreach ($array1 as $k => $v) {
 #               var_dump($v);
-            $isExist=false;
-            foreach($array2 as $k2=> $v2) {
-                if(empty(array_diff_assoc($v,$v2))){
-                    $isExist=true;
+            $isExist = false;
+            foreach ($array2 as $k2 => $v2) {
+                if (empty(array_diff_assoc($v, $v2))) {
+                    $isExist = true;
                     break;
                 }
             }
-            if(!$isExist) array_push($ret,$v);
+            if (!$isExist) array_push($ret, $v);
         }
         return $ret;
     }
