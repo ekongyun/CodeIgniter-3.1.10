@@ -46,12 +46,26 @@ class Base_model extends CI_Model
         return $this->db->insert_id();
     }
 
+    // TODO: 更新错误判断 https://stackoverflow.com/questions/20030642/check-if-db-update-successful-with-codeigniter-when-potentially-no-rows-are-upd
     function _update_key($table, $data, $where)
     {
+        $this->db->trans_start();
         $this->db->where($where);
         $this->db->update($table, $data);
-        return $this->db->affected_rows();
+        $this->db->trans_complete();
+        // return $this->db->affected_rows();
+        // was there any update or error?
+        if ($this->db->affected_rows() == '1') {
+            return TRUE;
+        } else {
+            // any trans error?
+            if ($this->db->trans_status() === FALSE) {
+                return FALSE;
+            }
+            return TRUE;
+        }
     }
+
 
     function _key_exists($table, $where)
     {
