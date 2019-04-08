@@ -121,6 +121,14 @@ class Role_model extends CI_Model
         return $query->result_array();
     }
 
+
+    /**
+     * 根据 角色ID 获取该角色所拥有的权限
+     * [
+     * ['role_id'=> 1, 'perm_id'=>1]
+     * ...
+     * ]
+     */
     function getRolePerm($RoleId)
     {
         $sql = "SELECT

@@ -316,6 +316,7 @@ class Role extends REST_Controller
         ];
         $this->set_response($message, REST_Controller::HTTP_OK);
     }
+
     // 获取所有角色带perm_id 不需权限验证
     function allroles_get()
     {

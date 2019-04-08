@@ -15,19 +15,85 @@ class User_model extends CI_Model
     /**
      * 获取所有用户列表
      */
-    function getUserList()
+    function getUserList($filters, $sort, $page, $pageSize)
     {
+
+        // 默认排序
+        $orderStr = '';
+        if ($sort['prop'] && $sort['order']) {
+            $orderStr = " ORDER BY " . $sort['prop'] . " " . ($sort['order'] === 'ascending' ? 'asc' : 'desc');
+        }
+
+        $filterStr = '';
+        $j = 0;
+        foreach ($filters as $k => $v) {
+            if ($v['value'] !== '' && !is_null($v['value'])) {
+                if ($j) {
+                    $filterStr = $filterStr . " and ";
+                }
+
+                if ($v['prop'] === 'username') {
+                    $filterStr .= $v['prop'] . " like '%" . $v['value'] . "%' ";
+                }
+                if ($v['prop'] === 'status') {
+                    $filterStr .= $v['prop'] . "=" . $v['value'];
+                }
+
+                $j++;
+            }
+        }
+
+        if ($filterStr) {
+            $filterStr = " and " . $filterStr;
+        }
+
         $sql = "SELECT
-                    u.*
+                     *
                 FROM
-                    sys_user u 
-                 ORDER BY
-                    u.listorder";
+                    sys_user where 1=1 "
+            . $filterStr
+            . $orderStr . " limit " . ($page - 1) * $pageSize . "," . $pageSize;
+
         $query = $this->db->query($sql);
-        return [
-            "items" => $query->result_array(),
-            "total" => count($query->result_array())
-        ];
+        return $query->result_array();
+    }
+
+    function getUserListCnt($filters)
+    {
+        $filterStr = '';
+        $j = 0;
+        foreach ($filters as $k => $v) {
+            if ($v['value'] !== '' && !is_null($v['value'])) {
+                if ($j) {
+                    $filterStr = $filterStr . " and ";
+                }
+
+                if ($v['prop'] === 'username') {
+                    $filterStr .= $v['prop'] . " like '%" . $v['value'] . "%' ";
+                }
+                if ($v['prop'] === 'status') {
+                    $filterStr .= $v['prop'] . "=" . $v['value'];
+                }
+
+                $j++;
+            }
+        }
+
+        if ($filterStr) {
+            $filterStr = " and " . $filterStr;
+        }
+        $sql = "SELECT
+                    count(u.id) cnt
+                FROM
+                    sys_user u  where 1=1 " . $filterStr;
+
+        $query = $this->db->query($sql);
+        if (empty($query->result_array())) {
+            return 0;
+        } else {
+            $result = $query->result_array();
+            return $result[0]['cnt'];
+        }
     }
 
     /**
@@ -60,8 +126,9 @@ class User_model extends CI_Model
         $query = $this->db->query($sql);
         return $query->result_array();
     }
+
     /**
-     * 根据 用户ID 获取该用户被分配的角色 编辑时使用
+     * 根据 用户ID 获取该用户被分配的角色
      *
      */
     function getUserRoles($Id)

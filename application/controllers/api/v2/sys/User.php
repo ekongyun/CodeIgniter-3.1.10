@@ -141,35 +141,40 @@ class User extends REST_Controller
             return;
         }
 
-        $UserArr = $this->User_model->getUserList();
+        $parms = $this->post();
+        //  $type = $parms['type'];
+        $filters = $parms['filters'];
+        $sort = $parms['sort'];
+        $page = $parms['page'];
+        $pageSize = $parms['pageSize'];
+
+        $UserArr = $this->User_model->getUserList($filters, $sort, $page, $pageSize);
+
+        $total = $this->User_model->getUserListCnt($filters);
+
+        // 遍历该用户所属角色信息
+        foreach ($UserArr as $k => $v) {
+            $UserArr[$k]['role'] = [];
+            $RoleArr = $this->User_model->getUserRoles($v['id']);
+            foreach ($RoleArr as $kk => $vv) {
+                array_push($UserArr[$k]['role'], $vv['id']);
+            }
+        }
         $message = [
             "code" => 20000,
-            "data" => $UserArr,
+            "data" => [
+                'items' => $UserArr,
+                'total' => intval($total)
+            ]
         ];
         $this->set_response($message, REST_Controller::HTTP_OK);
     }
 
     function getroleoptions_get()
     {
-
         $Token = $this->input->get_request_header('X-Token', TRUE);
 
         $RoleArr = $this->User_model->getRoleOptions($Token);
-        $message = [
-            "code" => 20000,
-            "data" => $RoleArr,
-        ];
-        $this->set_response($message, REST_Controller::HTTP_OK);
-    }
-
-    function getuserroles_post()
-    {
-
-        $parms = $this->post();  // 获取表单参数，类型为数组
-        //        var_dump($parms);
-        //        var_dump($parms['id']);
-        //        return;
-        $RoleArr = $this->User_model->getUserRoles($parms['id']);
         $message = [
             "code" => 20000,
             "data" => $RoleArr,
@@ -270,8 +275,8 @@ class User extends REST_Controller
             $RoleArr[$k] = ['user_id' => $id, 'role_id' => $v];
         }
 
-        unset($parms['id']);    // 剔除索引id
         unset($parms['role']);  // 剔除role数组
+        unset($parms['id']);    // 剔除索引id
 
         $where = ["id" => $id];
 
@@ -279,13 +284,13 @@ class User extends REST_Controller
             $message = [
                 "code" => 20000,
                 "type" => 'error',
-                "message" => $parms['name'] . ' - 用户更新错误'
+                "message" => $parms['username'] . ' - 用户更新错误'
             ];
             $this->set_response($message, REST_Controller::HTTP_OK);
             return;
         }
 
-        $RoleSqlArr = $this->Role_mode->getRolesByUserId($id);
+        $RoleSqlArr = $this->User_model->getRolesByUserId($id);
 
         $AddArr = $this->permission->array_diff_assoc2($RoleArr, $RoleSqlArr);
         // var_dump('------------只存在于前台传参 做添加操作-------------');
@@ -334,7 +339,7 @@ class User extends REST_Controller
         $message = [
             "code" => 20000,
             "type" => 'success',
-            "message" => $parms['name'] . ' - 用户更新成功'
+            "message" => $parms['username'] . ' - 用户更新成功'
         ];
         $this->set_response($message, REST_Controller::HTTP_OK);
     }
@@ -359,35 +364,21 @@ class User extends REST_Controller
             $message = [
                 "code" => 20000,
                 "type" => 'error',
-                "message" => $parms['name'] . ' - 角色不允许删除'
+                "message" => $parms['username'] . ' - 超级管理员不允许删除'
             ];
             $this->set_response($message, REST_Controller::HTTP_OK);
             return;
         }
 
-        // 删除外键关联表 sys_role_perm , sys_perm, sys_role
-        // 1. 根据sys_role id及'menu' 查找 perm_id
-        // 2. 删除sys_role_perm 中perm_id记录
-        // 3. 删除sys_perm中 perm_type='role' and r_id = role_id 记录,即第1步中获取的 perm_id， 一一对应
-        // 4. 删除sys_role 中 id = role_id 的记录
-        $where = 'perm_type="role" and r_id=' . $parms['id'];
-        $arr = $this->Base_model->_get_key('sys_perm', '*', $where);
-        if (empty($arr)) {
-            var_dump($this->uri->uri_string . ' 未查找到 sys_perm 表中记录');
-            var_dump($where);
-            return;
-        }
+        // 删除外键关联表 sys_user_role
+        $this->Base_model->_delete_key('sys_user_role', ['user_id' => $parms['id']]);
 
-        $perm_id = $arr[0]['id']; // 正常只有一条记录
-        $this->Base_model->_delete_key('sys_role_perm', ['perm_id' => $perm_id]);
-        $this->Base_model->_delete_key('sys_perm', ['id' => $perm_id]);
-
-        // 删除基础表 sys_role
-        if (!$this->Base_model->_delete_key('sys_role', $parms)) {
+        // 删除基础表 sys_user
+        if (!$this->Base_model->_delete_key('sys_user', $parms)) {
             $message = [
                 "code" => 20000,
                 "type" => 'error',
-                "message" => $parms['name'] . ' - 角色删除错误'
+                "message" => $parms['username'] . ' - 用户删除错误'
             ];
             $this->set_response($message, REST_Controller::HTTP_OK);
             return;
@@ -396,7 +387,7 @@ class User extends REST_Controller
         $message = [
             "code" => 20000,
             "type" => 'success',
-            "message" => $parms['name'] . ' - 角色删除成功'
+            "message" => $parms['username'] . ' - 用户删除成功'
         ];
         $this->set_response($message, REST_Controller::HTTP_OK);
 
