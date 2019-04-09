@@ -200,7 +200,7 @@ class User extends REST_Controller
         unset($parms['role']);    // 剔除role数组
         // 加入新增时间
         $parms['create_time'] = time();
-        // $parms['password'] = time();
+        $parms['password'] = md5($parms['password']);
 
         $user_id = $this->Base_model->_insert_key('sys_user', $parms);
         if (!$user_id) {
@@ -277,6 +277,7 @@ class User extends REST_Controller
 
         unset($parms['role']);  // 剔除role数组
         unset($parms['id']);    // 剔除索引id
+        unset($parms['password']);    // 剔除密码
 
         $where = ["id" => $id];
 
@@ -397,19 +398,17 @@ class User extends REST_Controller
     {
         $username = $this->post('username'); // POST param
         $password = $this->post('password'); // POST param
-//        var_dump($username);
-//        var_dump($password);
-        $input_account = $username;
-        $input_password = md5($password);
-        //  $result = $this->Api_model->app_user_login_validate($input_account, $input_password);
+
+        $result = $this->User_model->validate($username, md5($password));
+
         // 用户名密码正确 生成token 返回
-        if (1) {
+        if ($result['success']) {
             $Token = $this->_generate_token();
             $create_time = time();
             $expire_time = $create_time + 2 * 60 * 60;  // 2小时过期
 
             $data = [
-                'user_id' => 1, // test 登录时 model 获取
+                'user_id' => $result['userinfo']['id'],
                 'expire_time' => $expire_time,
                 'create_time' => $create_time
             ];

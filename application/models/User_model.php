@@ -13,6 +13,36 @@ class User_model extends CI_Model
     }
 
     /**
+     * 登陆校验用户名密码
+     * @param $username
+     * @param $passwd
+     */
+    function validate($username, $passwd)
+    {
+        $sql = "SELECT
+                    *
+                FROM
+                    sys_user
+                WHERE
+                    username = '" . $username . "'
+                AND password = '" . $passwd . "'";
+
+        $query = $this->db->query($sql);
+        if (($query->row_array()) == null) {
+            $result = array(
+                'success' => FALSE,
+                'userinfo' => null
+            );
+        } else {
+            $result = array(
+                'success' => TRUE,
+                'userinfo' => $query->row_array()
+            );
+        }
+        return $result;
+    }
+
+    /**
      * 获取所有用户列表
      */
     function getUserList($filters, $sort, $page, $pageSize)

@@ -132,7 +132,7 @@ class Base_model extends CI_Model
         $hasCtrl = $menuCtrl ? "" : " WHERE basetbl.type != 2";
 
         $sql = "SELECT
-                        t.id perm_id,
+                       DISTINCT t.id perm_id,
                         basetbl.*
                     FROM
                         (
