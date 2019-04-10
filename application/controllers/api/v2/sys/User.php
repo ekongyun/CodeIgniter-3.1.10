@@ -18,8 +18,7 @@ class User extends REST_Controller
         parent::__construct();
         $this->load->model('Base_model');
         $this->load->model('User_model');
-//        $this->load->model('Dept_model', 'Dept');
-//        $this->config->load('config', true);
+        // $this->config->load('config', true);
     }
 
     public function index_get()
@@ -1053,6 +1052,3 @@ class User extends REST_Controller
         }
     }
 }
-
-/* End of file welcome.php */
-/* Location: ./application/controllers/welcome.php */
