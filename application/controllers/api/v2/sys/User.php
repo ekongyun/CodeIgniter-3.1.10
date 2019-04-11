@@ -174,6 +174,11 @@ class User extends REST_Controller
         $Token = $this->input->get_request_header('X-Token', TRUE);
 
         $RoleArr = $this->User_model->getRoleOptions($Token);
+        // string to boolean
+        foreach ($RoleArr as $k => $v) {
+            $v['isDisabled'] === 'true' ? ($RoleArr[$k]['isDisabled'] = true) : ($RoleArr[$k]['isDisabled'] = false);
+        }
+
         $message = [
             "code" => 20000,
             "data" => $RoleArr,

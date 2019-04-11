@@ -127,11 +127,29 @@ class User_model extends CI_Model
     }
 
     /**
-     * 根据 $token 获取对应Token用户所拥有的角色类权限选项 新增时使用
+     * 获取所有角色列表
+     * 并且根据$token 获取对应Token用户所拥有的角色类权限选项
+     * 当用户含有未拥有的角色类权限时 设置 isDisabled 禁用选择
+     * 新增编辑时使用
+     *
      */
     function getRoleOptions($Token)
     {
         $sql = "SELECT
+                    r.id,
+                    r.name,
+                    r.remark,
+                    r.status,
+                    IF (
+                        t.name IS NULL,
+                        'true',
+                        'false'
+                    ) isDisabled, 
+                    r.listorder
+                FROM
+                    sys_role r
+                LEFT JOIN (
+                SELECT
                     r.id,
                     r.name,
                     r.remark,
@@ -152,7 +170,8 @@ class User_model extends CI_Model
                 AND p.perm_type = 'role'
                 AND p.r_id = r.id
                 AND r. STATUS = 1
-                order by r.listorder";
+                ) t ON r.id = t.id
+                ORDER BY r.listorder";
         $query = $this->db->query($sql);
         return $query->result_array();
     }
