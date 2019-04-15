@@ -43,6 +43,83 @@ class User_model extends CI_Model
     }
 
     /**
+     * 根据$token拉取用户信息
+     * @param $Token
+     */
+    function getUserInfo($Token)
+    {
+        $sql = "SELECT
+                    u.id,
+                    u.username,
+                    u.tel,
+                    u.email,
+                    u.avatar,
+                    u.sex,
+                    u.last_login_ip,
+                    u.last_login_time,
+                    u.status,
+                    u.role_id
+                FROM
+                    sys_user_token ut,
+                    sys_user u
+                WHERE
+                    ut.token = '" . $Token . "'
+                    AND u.id = ut.user_id";
+
+        $query = $this->db->query($sql);
+        if (($query->row_array()) == null) {
+            $result = array(
+                'success' => FALSE,
+                'userinfo' => null
+            );
+        } else {
+            $result = array(
+                'success' => TRUE,
+                'userinfo' => $query->row_array()
+            );
+        }
+        return $result;
+    }
+
+    /**
+     * 根据$token拉取用户角色信息
+     * @param $Token
+     */
+    function getUserRolesByToken($Token)
+    {
+        $sql = "SELECT
+                    r.id,r.name
+                FROM
+                    sys_user_token ut,
+                    sys_user_role ur,
+                    sys_role r
+                WHERE
+                    ut.token = '" . $Token . "'
+                    AND ur.user_id = ut.user_id
+                    AND r.id = ur.role_id
+                    and r.status=1";
+
+        $query = $this->db->query($sql);
+        return $query->result_array();
+    }
+
+    /**
+     * 根据$token拉取用户当前选择角色id
+     * @param $Token
+     */
+    function getCurrentRoleByToken($Token)
+    {
+        $sql = "SELECT
+                    ut.role_id
+                FROM
+                    sys_user_token ut
+                WHERE
+                    ut.token = '" . $Token . "'";
+        $query = $this->db->query($sql);
+        return $query->row_array()['role_id'];
+    }
+
+    /**
      * 获取所有用户列表
      */
     function getUserList($filters, $sort, $page, $pageSize)

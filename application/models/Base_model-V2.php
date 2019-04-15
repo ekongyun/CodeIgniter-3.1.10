@@ -146,7 +146,7 @@ class Base_model extends CI_Model
 			                    sys_role r
                             WHERE
                                 ut.token = '" . $token . "'
-                            AND ur.role_id = ut.role_id
+                            AND ur.user_id = ut.user_id
                             AND rp.role_id = ur.role_id
                             AND p.id = rp.perm_id
                             AND r.id = ur.role_id
@@ -176,7 +176,7 @@ class Base_model extends CI_Model
 			                    sys_role r
                             WHERE
                                 ut.token = '" . $token . "'
-                            AND ur.role_id = ut.role_id
+                            AND ur.user_id = ut.user_id
                             AND rp.role_id = ur.role_id
                             AND p.id = rp.perm_id
                             AND r.id = ur.role_id
@@ -225,8 +225,6 @@ class Base_model extends CI_Model
 
         return ['code' => 20000, 'message' => "Token 合法"];
     }
-
-
 
     /***********************
      * 权限模型部分结束

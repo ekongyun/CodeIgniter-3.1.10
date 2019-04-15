@@ -115,7 +115,6 @@ class Permission
         return $PermArr;
     }
 
-
     /**
      * 后端根据 $token,$uri 判断是否该用户是否过期及拥有的功能按钮控件操作权限
      * 增/删/改/查 控制器引用
