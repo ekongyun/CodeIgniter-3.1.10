@@ -411,9 +411,23 @@ class User extends REST_Controller
             $create_time = time();
             $expire_time = $create_time + 2 * 60 * 60;  // 2小时过期
 
+            $CurrentRole = $this->User_model->getLastLoginRole($result['userinfo']['id']);
+            if (!$CurrentRole) {
+                $CurrentRole = $this->User_model->getCurrentRole($result['userinfo']['id']);
+                if (!$CurrentRole) {
+                    // 自定义code 未分配角色或角色被删除，用户没有可用角色
+                    $message = [
+                        "code" => 50018,
+                        "message" => '用户未分配角色, 无法登录, 请联系管理员'
+                    ];
+                    $this->set_response($message, REST_Controller::HTTP_OK);
+                    return;
+                }
+            }
+
             $data = [
                 'user_id' => $result['userinfo']['id'],
-                'role_id' => $result['userinfo']['role_id'],
+                'role_id' => $CurrentRole,
                 'expire_time' => $expire_time,
                 'create_time' => $create_time
             ];
@@ -456,7 +470,7 @@ class User extends REST_Controller
 
         if ($Token !== $this->get('token')) {
             // 由前台切换角色 修改sys_user_token 表里 role_id 字段 并替换用户信息中的默认role_id
-            if (!$this->Base_model->_update_key('sys_user_token', ['role_id' => $this->get('token')],['token' => $Token])) {
+            if (!$this->Base_model->_update_key('sys_user_token', ['role_id' => $this->get('token')], ['token' => $Token])) {
                 $message = [
                     "code" => 20000,
                     "type" => 'error',

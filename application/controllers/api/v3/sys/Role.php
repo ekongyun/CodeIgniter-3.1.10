@@ -238,11 +238,12 @@ class Role extends REST_Controller
             return;
         }
 
-        // 删除外键关联表 sys_role_perm , sys_perm, sys_role
-        // 1. 根据sys_role id及'menu' 查找 perm_id
+        // 删除外键关联表 sys_role_perm , sys_perm, sys_role, sys_user_role
+        // 1. 根据sys_role id及'role' 查找 perm_id
         // 2. 删除sys_role_perm 中perm_id记录
         // 3. 删除sys_perm中 perm_type='role' and r_id = role_id 记录,即第1步中获取的 perm_id， 一一对应
-        // 4. 删除sys_role 中 id = role_id 的记录
+        // 4. 删除sys_user_role role_id 记录
+        // 5. 删除sys_role 中 id = role_id 的记录
         $where = 'perm_type="role" and r_id=' . $parms['id'];
         $arr = $this->Base_model->_get_key('sys_perm', '*', $where);
         if (empty($arr)) {
@@ -252,9 +253,11 @@ class Role extends REST_Controller
         }
 
         $perm_id = $arr[0]['id']; // 正常只有一条记录
-        $this->Base_model->_delete_key('sys_role_perm', ['perm_id' => $perm_id]);
+        $this->Base_model->_delete_key('sys_role_perm', ['perm_id' => $perm_id]); // 必须删除权限id 因为超级管理员角色自动拥有该权限否则会造成删除关联错误
+        $this->Base_model->_delete_key('sys_role_perm', ['role_id' => $parms['id']]); // 再删除该角色对应的权限id（原有的菜单）
         $this->Base_model->_delete_key('sys_perm', ['id' => $perm_id]);
 
+        $this->Base_model->_delete_key('sys_user_role', ['role_id' => $parms['id']]);
         // 删除基础表 sys_role
         if (!$this->Base_model->_delete_key('sys_role', $parms)) {
             $message = [
