@@ -252,8 +252,11 @@ class Role extends REST_Controller
         }
 
         $perm_id = $arr[0]['id']; // 正常只有一条记录
-        $this->Base_model->_delete_key('sys_role_perm', ['perm_id' => $perm_id]);
+        $this->Base_model->_delete_key('sys_role_perm', ['perm_id' => $perm_id]); // 必须删除权限id 因为超级管理员角色自动拥有该权限否则会造成删除关联错误
+        $this->Base_model->_delete_key('sys_role_perm', ['role_id' => $parms['id']]); // 再删除该角色对应的权限id（原有的菜单）
         $this->Base_model->_delete_key('sys_perm', ['id' => $perm_id]);
+
+        $this->Base_model->_delete_key('sys_user_role', ['role_id' => $parms['id']]);
 
         // 删除基础表 sys_role
         if (!$this->Base_model->_delete_key('sys_role', $parms)) {

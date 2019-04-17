@@ -43,6 +43,99 @@ class User_model extends CI_Model
     }
 
     /**
+     * 根据 $user_id 获取上次登录角色id
+     * @param $Id
+     */
+    function getLastLoginRole($Id)
+    {
+        $sql = "SELECT
+                    role_id
+                FROM
+                    sys_user_token
+                WHERE
+                    user_id =" . $Id . "
+                ORDER BY
+                    create_time DESC
+                limit 1";
+
+        $query = $this->db->query($sql);
+        $RolesArr = $query->result_array();
+
+        if (empty($RolesArr)) {
+            return [
+                "code" => "50020",
+                "message" => "用户首次登录，没有最后一次登录信息"
+            ];
+        } else {
+            foreach ($RolesArr as $k => $v) {
+                $sqlx = "SELECT
+                            DISTINCT dept_id
+                        FROM
+                            `sys_user_role`
+                        WHERE
+                            user_id =" . $Id . " and role_id=" . $v['role_id'];
+                $queryx = $this->db->query($sqlx);
+                if (empty($queryx->result_array())) {
+                    return [
+                        "code" => "50018",
+                        "message" => "用户机构信息不完整, 无法登录, 请联系管理员"
+                    ];
+                }
+            }
+            return [
+                "code" => "20000",
+                "role_id" => $RolesArr[0]['role_id']
+            ];
+        }
+    }
+
+    /**
+     * 根据 $user_id 获取一个角色作为当前选择默认角色
+     * 只在用户初次登录时使用
+     * @param $Id
+     */
+    function getCurrentRole($Id)
+    {
+        $sql = "SELECT
+                   DISTINCT role_id
+                FROM
+                    sys_user_role
+                WHERE
+                    user_id =" . $Id;
+
+        $query = $this->db->query($sql);
+        if (empty($query->result_array())) {
+            return [
+                "code" => "50018",
+                "message" => "用户未分配角色, 无法登录, 请联系管理员"
+            ];
+        }
+        $RolesArr = $query->result_array();
+
+        foreach ($RolesArr as $k => $v) {
+            $sqlx = "SELECT
+                            DISTINCT dept_id
+                        FROM
+                            `sys_user_role`
+                        WHERE
+                            user_id =" . $Id . " and role_id=" . $v['role_id'];
+            $queryx = $this->db->query($sqlx);
+            if (empty($queryx->result_array())) {
+                return [
+                    "code" => "50018",
+                    "message" => "用户机构信息不完整, 无法登录, 请联系管理员"
+                ];
+            }
+        }
+
+        return [
+            "code" => "20000",
+            "role_id" => $RolesArr[0]['role_id'],
+            "message" => "成功获取第一个角色"
+        ];
+    }
+
+    /**
      * 根据$token拉取用户信息
      * @param $Token
      */
@@ -57,8 +150,7 @@ class User_model extends CI_Model
                     u.sex,
                     u.last_login_ip,
                     u.last_login_time,
-                    u.status,
-                    u.role_id
+                    u.status
                 FROM
                     sys_user_token ut,
                     sys_user u
@@ -204,8 +296,8 @@ class User_model extends CI_Model
     }
 
     /**
-     * 获取所有角色列表
-     * 并且根据$token 获取对应Token用户所拥有的角色类权限选项
+     * 获取所有角色列表 参考 permission.php 权限库，因为需要左关联组合，所以只能重新写模型
+     * 并且根据$token 获取对应Token用户角色所拥有的角色类权限选项
      * 当用户含有未拥有的角色类权限时 设置 isDisabled 禁用选择
      * 新增编辑时使用
      *
@@ -226,27 +318,23 @@ class User_model extends CI_Model
                 FROM
                     sys_role r
                 LEFT JOIN (
-                SELECT
-                    r.id,
-                    r.name,
-                    r.remark,
-                    r.status
-                FROM
-                    sys_user_token ut,
-                    sys_user u,
-                    sys_user_role ur,
-                    sys_role_perm rp,
-                    sys_perm p,
-                    sys_role r
-                WHERE
-                    ut.token = '" . $Token . "'
-                AND ut.user_id = u.id
-                AND u.id = ur.user_id
-                AND ur.role_id = rp.role_id
-                AND rp.perm_id = p.id
-                AND p.perm_type = 'role'
-                AND p.r_id = r.id
-                AND r. STATUS = 1
+                    SELECT
+                        r.id,
+                        r.name,
+                        r.remark,
+                        r.status
+                    FROM
+                        sys_user_token ut,
+                        sys_role_perm rp,
+                        sys_perm p,
+                        sys_role r
+                    WHERE
+                        ut.token = '" . $Token . "'
+                    AND ut.role_id = rp.role_id
+                    AND rp.perm_id = p.id
+                    AND p.perm_type = 'role'
+                    AND p.r_id = r.id
+                    AND r.status = 1
                 ) t ON r.id = t.id
                 ORDER BY r.listorder";
         $query = $this->db->query($sql);

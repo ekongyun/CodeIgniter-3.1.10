@@ -202,6 +202,10 @@ class User extends REST_Controller
         // 参数数据预处理
         $RoleArr = $parms['role'];
         unset($parms['role']);    // 剔除role数组
+
+        $RoleDeptArr = $parms['roledept'];
+        unset($parms['roledept']);    // 剔除role数组
+
         // 加入新增时间
         $parms['create_time'] = time();
         $parms['password'] = md5($parms['password']);
@@ -220,11 +224,13 @@ class User extends REST_Controller
         $failed = false;
         $failedArr = [];
         foreach ($RoleArr as $k => $v) {
-            $arr = ['user_id' => $user_id, 'role_id' => $v];
-            $ret = $this->Base_model->_insert_key('sys_user_role', $arr);
-            if (!$ret) {
-                $failed = true;
-                array_push($failedArr, $arr);
+            foreach ($RoleDeptArr[$v] as $kk => $vv) {
+                $arr = ['user_id' => $user_id, 'role_id' => $v, 'dept_id' => $vv];
+                $ret = $this->Base_model->_insert_key('sys_user_role', $arr);
+                if (!$ret) {
+                    $failed = true;
+                    array_push($failedArr, $arr);
+                }
             }
         }
 
@@ -411,18 +417,22 @@ class User extends REST_Controller
             $create_time = time();
             $expire_time = $create_time + 2 * 60 * 60;  // 2小时过期
 
-            $CurrentRole = $this->User_model->getLastLoginRole($result['userinfo']['id']);
-            if (!$CurrentRole) {
-                $CurrentRole = $this->User_model->getCurrentRole($result['userinfo']['id']);
-                if (!$CurrentRole) {
+            $lastLoginRet = $this->User_model->getLastLoginRole($result['userinfo']['id']);
+            if ($lastLoginRet['code'] == '50018') {
+                $this->set_response($lastLoginRet, REST_Controller::HTTP_OK);
+                return;
+            }
+
+            if ($lastLoginRet['code'] == '20000') {
+                $CurrentRole = $lastLoginRet['role_id'];
+            } else if ($lastLoginRet['code'] == '50018') {
+                $ret = $this->User_model->getCurrentRole($result['userinfo']['id']);
+                if ($ret['code'] !== '20000') {
                     // 自定义code 未分配角色或角色被删除，用户没有可用角色
-                    $message = [
-                        "code" => 50018,
-                        "message" => '用户未分配角色, 无法登录, 请联系管理员'
-                    ];
-                    $this->set_response($message, REST_Controller::HTTP_OK);
+                    $this->set_response($ret, REST_Controller::HTTP_OK);
                     return;
                 }
+                $CurrentRole = $ret['role_id'];
             }
 
             $data = [
