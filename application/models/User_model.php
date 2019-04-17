@@ -46,7 +46,7 @@ class User_model extends CI_Model
      * 根据 $user_id 获取上次登录角色id
      * @param $Id
      */
-    function getLastLoginRole($Id)
+    function getLastLoginRole ($Id)
     {
         $sql = "SELECT
                     role_id
@@ -112,7 +112,7 @@ class User_model extends CI_Model
         }
         $RolesArr = $query->result_array();
 
-        foreach ($RolesArr as $k => $v) {
+        foreach ($RolesArr as $k => $v ) {
             $sqlx = "SELECT
                             DISTINCT dept_id
                         FROM
