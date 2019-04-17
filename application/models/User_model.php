@@ -46,7 +46,7 @@ class User_model extends CI_Model
      * 根据 $user_id 获取上次登录角色id
      * @param $Id
      */
-    function getLastLoginRole ($Id)
+    function getLastLoginRole($Id)
     {
         $sql = "SELECT
                     role_id
@@ -112,7 +112,7 @@ class User_model extends CI_Model
         }
         $RolesArr = $query->result_array();
 
-        foreach ($RolesArr as $k => $v ) {
+        foreach ($RolesArr as $k => $v) {
             $sqlx = "SELECT
                             DISTINCT dept_id
                         FROM
@@ -348,7 +348,7 @@ class User_model extends CI_Model
     function getUserRoles($Id)
     {
         $sql = "SELECT
-                    r.id,
+                    DISTINCT r.id,
                     r.name,
                     r.remark,
                     r.status
@@ -358,6 +358,20 @@ class User_model extends CI_Model
                 WHERE
                     ur.role_id = r.id
                 AND ur.user_id =" . $Id;
+
+        $query = $this->db->query($sql);
+        return $query->result_array();
+    }
+
+    function getUserRolesDept($user_id, $role_id)
+    {
+        $sql = "SELECT
+                    *
+                FROM
+                    sys_user_role ur
+                WHERE
+                    ur.role_id =" . $role_id . "
+                AND ur.user_id =" . $user_id;
 
         $query = $this->db->query($sql);
         return $query->result_array();
@@ -373,7 +387,7 @@ class User_model extends CI_Model
     function getRolesByUserId($Id)
     {
         $sql = "SELECT
-                    ur.user_id,ur.role_id
+                    ur.user_id,ur.role_id,ur.dept_id
                 FROM
                     sys_user_role ur
                  WHERE ur.user_id=" . $Id;

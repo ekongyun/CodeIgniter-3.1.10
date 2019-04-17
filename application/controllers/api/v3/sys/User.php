@@ -151,14 +151,22 @@ class User extends REST_Controller
 
         $total = $this->User_model->getUserListCnt($filters);
 
-        // 遍历该用户所属角色信息
+        // 遍历该用户所属角色的机构信息
         foreach ($UserArr as $k => $v) {
             $UserArr[$k]['role'] = [];
+            $UserArr[$k]['roledept'] = [];
             $RoleArr = $this->User_model->getUserRoles($v['id']);
             foreach ($RoleArr as $kk => $vv) {
                 array_push($UserArr[$k]['role'], $vv['id']);
+                $RoleDeptArr = $this->User_model->getUserRolesDept($v['id'], $vv['id']);
+
+                $UserArr[$k]['roledept'][$vv['name'] . '-' . $vv['id']] = [];
+                foreach ($RoleDeptArr as $kkk => $vvv) {
+                    array_push($UserArr[$k]['roledept'][$vv['name'] . '-' . $vv['id']], $vvv['dept_id']);
+                }
             }
         }
+
         $message = [
             "code" => 20000,
             "data" => [
@@ -203,8 +211,27 @@ class User extends REST_Controller
         $RoleArr = $parms['role'];
         unset($parms['role']);    // 剔除role数组
 
-        $RoleDeptArr = $parms['roledept'];
-        unset($parms['roledept']);    // 剔除role数组
+        $RoleDeptArr = $parms['roledepts'];
+        unset($parms['roledepts']);    // 剔除role数组
+        unset($parms['roledept']);     // 前台传参过来多余的空数组
+
+        $failed = false;
+        foreach ($RoleDeptArr as $k => $v) {
+            if (!array_key_exists('dept_id', $v) || !count($v['dept_id'])) {
+                $failed = true;
+                break;
+            }
+        }
+
+        if ($failed) {
+            $message = [
+                "code" => 20000,
+                "type" => 'error',
+                "message" => '所选的角色没有关联对应机构, 请检查'
+            ];
+            $this->set_response($message, REST_Controller::HTTP_OK);
+            return;
+        }
 
         // 加入新增时间
         $parms['create_time'] = time();
@@ -223,9 +250,9 @@ class User extends REST_Controller
 
         $failed = false;
         $failedArr = [];
-        foreach ($RoleArr as $k => $v) {
-            foreach ($RoleDeptArr[$v] as $kk => $vv) {
-                $arr = ['user_id' => $user_id, 'role_id' => $v, 'dept_id' => $vv];
+        foreach ($RoleDeptArr as $k => $v) {
+            foreach ($v['dept_id'] as $kk => $vv) {
+                $arr = ['user_id' => $user_id, 'role_id' => $v['role_id'], 'dept_id' => $vv];
                 $ret = $this->Base_model->_insert_key('sys_user_role', $arr);
                 if (!$ret) {
                     $failed = true;
@@ -238,7 +265,7 @@ class User extends REST_Controller
             $message = [
                 "code" => 20000,
                 "type" => 'error',
-                "message" => '用户关联角色失败 ' . json_encode($failedArr)
+                "message" => '用户关联角色机构失败 ' . json_encode($failedArr)
             ];
             $this->set_response($message, REST_Controller::HTTP_OK);
             return;
@@ -279,13 +306,35 @@ class User extends REST_Controller
             return;
         }
 
-        $id = $parms['id'];
-        $RoleArr = [];
-        foreach ($parms['role'] as $k => $v) {
-            $RoleArr[$k] = ['user_id' => $id, 'role_id' => $v];
+        $failed = false;
+        foreach ($parms['roledepts'] as $k => $v) {
+            if (!array_key_exists('dept_id', $v) || !count($v['dept_id'])) {
+                $failed = true;
+                break;
+            }
         }
 
-        unset($parms['role']);  // 剔除role数组
+        if ($failed) {
+            $message = [
+                "code" => 20000,
+                "type" => 'error',
+                "message" => '所选的角色没有关联对应机构, 请检查'
+            ];
+            $this->set_response($message, REST_Controller::HTTP_OK);
+            return;
+        }
+
+        $id = $parms['id'];
+        $RoleArr = []; // 前台传参数过来的 role_id, dept_id对
+        foreach ($parms['roledepts'] as $k => $v) {
+            foreach ($v['dept_id'] as $kk => $vv) {
+                array_push($RoleArr, ['user_id' => $id, 'role_id' => $v['role_id'], 'dept_id' => $vv]);
+            }
+        }
+
+        unset($parms['role']);  // 剔除role数组 多余 使用roledepts替换
+        unset($parms['roledept']);  // 剔除role数组 多余 使用roledepts替换
+        unset($parms['roledepts']);
         unset($parms['id']);    // 剔除索引id
         unset($parms['password']);    // 剔除密码
 
@@ -924,7 +973,8 @@ class User extends REST_Controller
     /**
      * 执行CURL请求，并封装返回对象
      */
-    private function execCURL($ch)
+    private
+    function execCURL($ch)
     {
         $response = curl_exec($ch);
         $error = curl_error($ch);
@@ -955,7 +1005,8 @@ class User extends REST_Controller
      * GET 请求
      * @param string $url
      */
-    private function http_get($url)
+    private
+    function http_get($url)
     {
         $oCurl = curl_init();
         if (stripos($url, "https://") !== FALSE) {
@@ -983,7 +1034,8 @@ class User extends REST_Controller
      * @param boolean $post_file 是否文件上传
      * @return string content
      */
-    private function http_post($url, $param, $post_file = false)
+    private
+    function http_post($url, $param, $post_file = false)
     {
         $oCurl = curl_init();
 
