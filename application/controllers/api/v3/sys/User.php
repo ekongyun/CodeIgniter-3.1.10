@@ -208,19 +208,15 @@ class User extends REST_Controller
         $parms = $this->post();  // 获取表单参数，类型为数组
 
         // 参数数据预处理
-        $RoleArr = $parms['role'];
-        unset($parms['role']);    // 剔除role数组
-
-        $RoleDeptArr = $parms['roledepts'];
-        unset($parms['roledepts']);    // 剔除role数组
-        unset($parms['roledept']);     // 前台传参过来多余的空数组
-
         $failed = false;
-        foreach ($RoleDeptArr as $k => $v) {
+        foreach ($parms['roledepts'] as $k => $v) {
             if (!array_key_exists('dept_id', $v) || !count($v['dept_id'])) {
-                $failed = true;
-                break;
+                unset($parms['roledepts'][$k]);
             }
+        }
+
+        if(!count($parms['roledepts'])) {
+            $failed = true;
         }
 
         if ($failed) {
@@ -232,6 +228,11 @@ class User extends REST_Controller
             $this->set_response($message, REST_Controller::HTTP_OK);
             return;
         }
+
+        $RoleDeptArr = $parms['roledepts'];
+        unset($parms['role']);    // 剔除role数组
+        unset($parms['roledept']);     // 前台传参过来多余的空数组
+        unset($parms['roledepts']);    // 剔除role数组
 
         // 加入新增时间
         $parms['create_time'] = time();
@@ -309,9 +310,12 @@ class User extends REST_Controller
         $failed = false;
         foreach ($parms['roledepts'] as $k => $v) {
             if (!array_key_exists('dept_id', $v) || !count($v['dept_id'])) {
-                $failed = true;
-                break;
+                unset($parms['roledepts'][$k]);
             }
+        }
+
+        if(!count($parms['roledepts'])) {
+            $failed = true;
         }
 
         if ($failed) {
@@ -474,7 +478,7 @@ class User extends REST_Controller
 
             if ($lastLoginRet['code'] == '20000') {
                 $CurrentRole = $lastLoginRet['role_id'];
-            } else if ($lastLoginRet['code'] == '50018') {
+            } else {
                 $ret = $this->User_model->getCurrentRole($result['userinfo']['id']);
                 if ($ret['code'] !== '20000') {
                     // 自定义code 未分配角色或角色被删除，用户没有可用角色

@@ -180,7 +180,7 @@ class User_model extends CI_Model
     function getUserRolesByToken($Token)
     {
         $sql = "SELECT
-                    r.id,r.name
+                    DISTINCT r.id,r.name
                 FROM
                     sys_user_token ut,
                     sys_user_role ur,
