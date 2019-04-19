@@ -177,23 +177,6 @@ class User extends REST_Controller
         $this->set_response($message, REST_Controller::HTTP_OK);
     }
 
-    function getroleoptions_get()
-    {
-        $Token = $this->input->get_request_header('X-Token', TRUE);
-
-        $RoleArr = $this->User_model->getRoleOptions($Token);
-        // string to boolean
-        foreach ($RoleArr as $k => $v) {
-            $v['isDisabled'] === 'true' ? ($RoleArr[$k]['isDisabled'] = true) : ($RoleArr[$k]['isDisabled'] = false);
-        }
-
-        $message = [
-            "code" => 20000,
-            "data" => $RoleArr,
-        ];
-        $this->set_response($message, REST_Controller::HTTP_OK);
-    }
-
     // 增
     function add_post()
     {
@@ -558,6 +541,10 @@ class User extends REST_Controller
             $info['name'] = "Super Admin";
             $info['identify'] = "410000000000000000";
             $info['phone'] = "13633838282";
+
+            // 当前用户的当前角色拥有的部门
+            $info['depts'] = $this->User_model->getCurrentDeptByToken($Token); // 当前选择部门;
+            $info['roleoptions'] = $this->User_model->getRoleOptions($Token); // 角色选择选项;
 
             $MenuTreeArr = $this->permission->getPermission($Token, 'menu', false);
             $asyncRouterMap = $this->permission->genVueRouter($MenuTreeArr, 'id', 'pid', 0);

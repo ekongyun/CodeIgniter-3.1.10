@@ -275,7 +275,7 @@ class Permission
     }
 
     /**
-     * 将数据格式化成树形结构 ___非递归方式，使用了数组指针，与前面json方式一样，array 必须以1开头___
+     * 将数据格式化成树形结构 ___非递归方式，使用了数组指针，与前面json方式一样，array 索引必须以1开头___
      * @author Xuefen.Tong
      * @param array $items
      * @return array

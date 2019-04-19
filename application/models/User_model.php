@@ -212,6 +212,38 @@ class User_model extends CI_Model
     }
 
     /**
+     * 根据$token拉取用户当前选择部门
+     * @param $Token
+     */
+    function getCurrentDeptByToken($Token)
+    {
+        $sql = "SELECT
+                    ut.user_id,
+                    ut.role_id
+                FROM
+                    sys_user_token ut
+                WHERE
+                    ut.token = '" . $Token . "'";
+        $query = $this->db->query($sql);
+        $arr = $query->result_array();
+
+        $sqlx = "SELECT DISTINCT
+                    d.id,
+                    d.pid,
+                    d.name label
+                FROM
+                    sys_user_role ur,
+                    sys_dept d
+                WHERE
+                    ur.user_id =" . $arr[0]['user_id'] . "
+                AND ur.role_id =" . $arr[0]['role_id'] . "
+                AND ur.dept_id = d.id";
+
+        $queryx = $this->db->query($sqlx);
+        return $queryx->result_array();
+    }
+
+    /**
      * 获取所有用户列表
      */
     function getUserList($filters, $sort, $page, $pageSize)
@@ -338,7 +370,13 @@ class User_model extends CI_Model
                 ) t ON r.id = t.id
                 ORDER BY r.listorder";
         $query = $this->db->query($sql);
-        return $query->result_array();
+        $RoleArr = $query->result_array();
+
+        // string to boolean
+        foreach ($RoleArr as $k => $v) {
+            $v['isDisabled'] === 'true' ? ($RoleArr[$k]['isDisabled'] = true) : ($RoleArr[$k]['isDisabled'] = false);
+        }
+        return $RoleArr;
     }
 
     /**
