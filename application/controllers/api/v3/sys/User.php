@@ -147,11 +147,21 @@ class User extends REST_Controller
         $page = $parms['page'];
         $pageSize = $parms['pageSize'];
 
-        $UserArr = $this->User_model->getUserList($filters, $sort, $page, $pageSize);
+        // 1. 找出用户角色拥有的机构查看权限
+        // 2. 用户列表只能是这些机构下的用户
+        $DeptArr = $this->User_model->getCurrentDeptByToken($Token);
+        $DeptListArr = [];
+        foreach ($DeptArr as $k => $v) {
+            array_push($DeptListArr, $v['id']);
+        }
 
-        $total = $this->User_model->getUserListCnt($filters);
+        $deptIdStr = implode(",", $DeptListArr); // string(9) "1,2,3,4,5"
 
-        // 遍历该用户所属角色的机构信息
+        $UserArr = $this->User_model->getUserList($deptIdStr, $filters, $sort, $page, $pageSize);
+
+        $total = $this->User_model->getUserListCnt($deptIdStr, $filters);
+
+        // 遍历所有用户所属角色的机构信息
         foreach ($UserArr as $k => $v) {
             $UserArr[$k]['role'] = [];
             $UserArr[$k]['roledept'] = [];
@@ -198,7 +208,7 @@ class User extends REST_Controller
             }
         }
 
-        if(!count($parms['roledepts'])) {
+        if (!count($parms['roledepts'])) {
             $failed = true;
         }
 
@@ -297,7 +307,7 @@ class User extends REST_Controller
             }
         }
 
-        if(!count($parms['roledepts'])) {
+        if (!count($parms['roledepts'])) {
             $failed = true;
         }
 

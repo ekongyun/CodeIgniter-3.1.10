@@ -246,7 +246,7 @@ class User_model extends CI_Model
     /**
      * 获取所有用户列表
      */
-    function getUserList($filters, $sort, $page, $pageSize)
+    function getUserList($deptIdStr, $filters, $sort, $page, $pageSize)
     {
 
         // 默认排序
@@ -281,7 +281,14 @@ class User_model extends CI_Model
         $sql = "SELECT
                      *
                 FROM
-                    sys_user where 1=1 "
+                    sys_user where id IN (
+                        SELECT DISTINCT
+                            user_id
+                        FROM
+                            sys_user_role ur
+                        WHERE
+                            dept_id IN (" . $deptIdStr . ")
+                    ) "
             . $filterStr
             . $orderStr . " limit " . ($page - 1) * $pageSize . "," . $pageSize;
 
@@ -289,7 +296,7 @@ class User_model extends CI_Model
         return $query->result_array();
     }
 
-    function getUserListCnt($filters)
+    function getUserListCnt($deptIdStr, $filters)
     {
         $filterStr = '';
         $j = 0;
@@ -316,7 +323,15 @@ class User_model extends CI_Model
         $sql = "SELECT
                     count(u.id) cnt
                 FROM
-                    sys_user u  where 1=1 " . $filterStr;
+                   sys_user u where id IN (
+                        SELECT DISTINCT
+                            user_id
+                        FROM
+                            sys_user_role ur
+                        WHERE
+                            dept_id IN (" . $deptIdStr . ")
+                    ) "
+                . $filterStr;
 
         $query = $this->db->query($sql);
         if (empty($query->result_array())) {
