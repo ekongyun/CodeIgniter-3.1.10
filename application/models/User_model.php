@@ -278,6 +278,7 @@ class User_model extends CI_Model
             $filterStr = " and " . $filterStr;
         }
 
+        //TODO: 将超级管理员隐藏  sys_user u where  id != 1 and id IN (
         $sql = "SELECT
                      *
                 FROM
@@ -320,6 +321,7 @@ class User_model extends CI_Model
         if ($filterStr) {
             $filterStr = " and " . $filterStr;
         }
+        // TODO: 将超级管理员隐藏  sys_user u where  id != 1 and id IN (
         $sql = "SELECT
                     count(u.id) cnt
                 FROM

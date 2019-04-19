@@ -464,10 +464,6 @@ class User extends REST_Controller
             $expire_time = $create_time + 2 * 60 * 60;  // 2小时过期
 
             $lastLoginRet = $this->User_model->getLastLoginRole($result['userinfo']['id']);
-            if ($lastLoginRet['code'] == '50018') {
-                $this->set_response($lastLoginRet, REST_Controller::HTTP_OK);
-                return;
-            }
 
             if ($lastLoginRet['code'] == '20000') {
                 $CurrentRole = $lastLoginRet['role_id'];
