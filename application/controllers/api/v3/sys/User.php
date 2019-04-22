@@ -671,6 +671,51 @@ class User extends REST_Controller
 
     }
 
+    // 根据token拉取 treeselect 下拉选项菜单
+    function roleoptions_get()
+    {
+        // 此 uri 可不做权限/token过期验证，则在菜单里，可以不加入此项路由path /sys/menu/treeoptions。
+        //
+        //        $uri = $this->uri->uri_string;
+        //        $Token = $this->input->get_request_header('X-Token', TRUE);
+        //        $retPerm = $this->permission->HasPermit($Token, $uri);
+        //        if ($retPerm['code'] != 50000) {
+        //            $this->set_response($retPerm, REST_Controller::HTTP_OK);
+        //            return;
+        //        }
+
+        $Token = $this->input->get_request_header('X-Token', TRUE);
+        $RoleArr = $this->User_model->getRoleOptions($Token);
+
+        $message = [
+            "code" => 20000,
+            "data" => $RoleArr,
+        ];
+        $this->set_response($message, REST_Controller::HTTP_OK);
+    }
+
+    function deptoptions_get()
+    {
+        // 此 uri 可不做权限/token过期验证，则在菜单里，可以不加入此项路由path /sys/menu/treeoptions。
+        //
+        //        $uri = $this->uri->uri_string;
+        //        $Token = $this->input->get_request_header('X-Token', TRUE);
+        //        $retPerm = $this->permission->HasPermit($Token, $uri);
+        //        if ($retPerm['code'] != 50000) {
+        //            $this->set_response($retPerm, REST_Controller::HTTP_OK);
+        //            return;
+        //        }
+
+        $Token = $this->input->get_request_header('X-Token', TRUE);
+        $DeptArr = $this->User_model->getCurrentDeptByToken($Token);
+
+        $message = [
+            "code" => 20000,
+            "data" => $DeptArr,
+        ];
+        $this->set_response($message, REST_Controller::HTTP_OK);
+    }
+
     //    async router test get
     function router_get()
     {
