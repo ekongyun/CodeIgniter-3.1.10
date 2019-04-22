@@ -224,6 +224,29 @@ class Permission
         return $tree;
     }
 
+    // 生成部门机构树
+    function genDeptTree($data, $idKey, $fidKey, $pId)
+    {
+        $tree = array();
+        foreach ($data as $k => $v) {
+            // 找到父节点为$pId的节点，然后进行递归查找其子节点，
+            if ($v[$fidKey] == $pId) {
+                // 数据库取出为string类型，强制类型转换成整形，方便前端使用
+                isset($v['id']) ? $v['id'] = intval($v['id']) : '';
+                isset($v['pid']) ? $v['pid'] = intval($v['pid']) : '';
+                isset($v['listorder']) ? $v['listorder'] = intval($v['listorder']) : '';
+
+                $v['children'] = $this->genDeptTree($data, $idKey, $fidKey, $v[$idKey]);
+                // vue treeselect 组件子节点为空时会列出，将空的子节点删除 children key.
+                if (empty($v['children'])) {
+                    unset($v['children']);
+                }
+                $tree[] = $v;     // 循环数组添加元素 属于同一层级
+            }
+        }
+        return $tree;
+    }
+
     /**
      * 指定格式两个二维数组比较差集
      * @param $array1
