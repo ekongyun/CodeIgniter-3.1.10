@@ -520,24 +520,35 @@ class User extends REST_Controller
         $Token = $this->input->get_request_header('X-Token', TRUE);
         // $this->get('token') // get 参数token
 
-        if ($Token !== $this->get('token')) {
-            // 由前台切换角色 修改sys_user_token 表里 role_id 字段 并替换用户信息中的默认role_id
-            if (!$this->Base_model->_update_key('sys_user_token', ['role_id' => $this->get('token')], ['token' => $Token])) {
-                $message = [
-                    "code" => 20000,
-                    "type" => 'error',
-                    "message" => '角色切换失败'
-                ];
-                $this->set_response($message, REST_Controller::HTTP_OK);
-                return;
-            }
-        }
-
         $result = $this->User_model->getUserInfo($Token);
 
         // 获取用户信息成功
         if ($result['success']) {
             $info = $result['userinfo'];
+
+            if ($Token !== $this->get('token')) {
+                // 由前台切换角色 修改sys_user_token 表里 role_id 字段 并替换用户信息中的默认role_id
+                // 判断切换后的角色是否有对应机构
+                if(!$this->User_model->roleHasDept($this->get('token'), $info['id'])){
+                    $message = [
+                        "code" => 20000,
+                        "type" => 'error',
+                        "message" => '角色切换失败,该角色没有对应的部门机构，请联系管理员分配'
+                    ];
+                    $this->set_response($message, REST_Controller::HTTP_OK);
+                    return;
+                }
+
+                if (!$this->Base_model->_update_key('sys_user_token', ['role_id' => $this->get('token')], ['token' => $Token])) {
+                    $message = [
+                        "code" => 20000,
+                        "type" => 'error',
+                        "message" => '角色切换失败'
+                    ];
+                    $this->set_response($message, REST_Controller::HTTP_OK);
+                    return;
+                }
+            }
 
             // 附加信息
             $info['roles'] = $this->User_model->getUserRolesByToken($Token);

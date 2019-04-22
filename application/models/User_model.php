@@ -136,6 +136,28 @@ class User_model extends CI_Model
     }
 
     /**
+     * @param $RoleId
+     * @param $UserId
+     * @return bool
+     * 判断该用户角色是否已分配机构部门
+     */
+    function roleHasDept($RoleId, $UserId)
+    {
+        $sql = "SELECT
+                 DISTINCT dept_id
+                 FROM
+                     `sys_user_role`
+                 WHERE
+                     user_id =" . $UserId . " and role_id=" . $RoleId;
+        $query = $this->db->query($sql);
+        if (empty($query->result_array())) {
+            return FALSE;
+         } else {
+            return TRUE;
+        }
+    }
+
+    /**
      * 根据$token拉取用户信息
      * @param $Token
      */
@@ -333,7 +355,7 @@ class User_model extends CI_Model
                         WHERE
                             dept_id IN (" . $deptIdStr . ")
                     ) "
-                . $filterStr;
+            . $filterStr;
 
         $query = $this->db->query($sql);
         if (empty($query->result_array())) {
