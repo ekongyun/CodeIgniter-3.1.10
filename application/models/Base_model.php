@@ -167,7 +167,7 @@ class Base_model extends CI_Model
                     FROM
                         (
                             SELECT
-                                p.*
+                               DISTINCT p.*
                             FROM
                                 sys_user_token ut,
                                 sys_user_role ur,
