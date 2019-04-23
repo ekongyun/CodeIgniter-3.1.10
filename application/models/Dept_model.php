@@ -19,7 +19,7 @@ class Dept_model extends CI_Model
         $sql = "SELECT
                     d.id,
                     d.pid,
-                    d.name label,
+                    d.name,
                     d.aliasname,
                     d.listorder,
                     d.status

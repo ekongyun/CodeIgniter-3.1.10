@@ -560,8 +560,8 @@ class User extends REST_Controller
             $info['phone'] = "13633838282";
 
             // 当前用户的当前角色拥有的部门
-            $info['depts'] = $this->User_model->getCurrentDeptByToken($Token); // 当前选择部门;
-            $info['roleoptions'] = $this->User_model->getRoleOptions($Token); // 角色选择选项;
+//            $info['depts'] = $this->User_model->getCurrentDeptByToken($Token); // 当前选择部门;
+//            $info['roleoptions'] = $this->User_model->getRoleOptions($Token); // 角色选择选项;
 
             $MenuTreeArr = $this->permission->getPermission($Token, 'menu', false);
             $asyncRouterMap = $this->permission->genVueRouter($MenuTreeArr, 'id', 'pid', 0);
